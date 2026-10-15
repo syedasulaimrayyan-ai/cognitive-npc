@@ -9,7 +9,7 @@
  * Decisions recorded here shape NPC dialogue (knowledge.js reads them) and
  * the completion epilogue.
  */
-import { STAGE } from '../core/constants.js';
+import { STAGE } from '../core/constants';
 
 const KEY = 'cnpc2.mission';
 
@@ -161,11 +161,7 @@ export class Mission {
   reset() {
     this.state = {
       stage: STAGE.INTRO,
-      decisions: {
-        askedMaya: false, toldRosaAboutMaya: false, suspicionPlanted: false,
-        toldVictorAccused: false, toldMayaVictor: false, clueGiven: false,
-        foundWithoutClue: false, victimized: false,
-      },
+      decisions: { ...DEFAULT_DECISIONS },
       completedAt: null,
       epilogue: null,
     };

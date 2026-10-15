@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import * as C from './constants.js';
+import * as C from './constants';
 
 /**
  * Uniform-grid of static AABBs. The player is treated as a horizontal circle

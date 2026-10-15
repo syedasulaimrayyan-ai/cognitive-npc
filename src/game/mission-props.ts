@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import * as C from '../core/constants.js';
+import * as C from '../core/constants';
 
 /**
  * Mission-specific set dressing for "THE MISSING SUPPLY":

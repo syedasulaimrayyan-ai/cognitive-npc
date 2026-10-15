@@ -1,4 +1,4 @@
-import { NPCS } from '../../core/constants.js';
+import { NPCS } from '../../core/constants';
 
 /** Persona index for dialogue + memory reset support. Keyed by NPC id. */
 export const PERSONAS = Object.fromEntries(

@@ -1,16 +1,16 @@
 import * as THREE from 'three';
-import * as C from './constants.js';
-import { SkyDome, buildEnvironment } from './environment.js';
-import { buildMissionProps } from '../game/mission-props.js';
-import { Mission } from '../game/mission.js';
-import { AssetLoader } from './asset-loader.js';
-import { Input } from './input.js';
-import { CameraRig } from './camera-rig.js';
-import { CollisionGrid } from './collision.js';
-import { PlayerAvatar } from '../entities/player-avatar.js';
-import { NPCAvatar } from '../entities/npc-avatar.js';
-import { DialogueEngine } from '../ai/dialogue-engine.js';
-import { VoiceIO } from '../ai/voice/voice-io.js';
+import * as C from './constants';
+import { SkyDome, buildEnvironment } from './environment';
+import { buildMissionProps } from '../game/mission-props';
+import { Mission } from '../game/mission';
+import { AssetLoader } from './asset-loader';
+import { Input } from './input';
+import { CameraRig } from './camera-rig';
+import { CollisionGrid } from './collision';
+import { PlayerAvatar } from '../entities/player-avatar';
+import { NPCAvatar } from '../entities/npc-avatar';
+import { DialogueEngine } from '../ai/dialogue-engine';
+import { VoiceIO } from '../ai/voice/voice-io';
 
 /**
  * Imperative Three.js orchestrator. React never touches the 3D scene graph;
@@ -98,7 +98,10 @@ export class GameClient {
       clips: C.CHARACTERS.player.clips,
     });
     this.player.root.position.set(C.PLAYER_SPAWN.x, 0, C.PLAYER_SPAWN.z);
-    this.player.root.rotation.y = Math.PI; // face north up the main street
+    // Soldier.glb's forward is local −z, which IS north at identity rotation
+    // (yaw 0 ≡ facing −z ≡ camera forward at spawn) — so no initial rotation
+    // and no 180° swing on the first frames; _facingYaw starts at 0 too.
+    this.player.root.rotation.y = 0;
     this.scene.add(this.player.root);
 
     // --- NPCs ----------------------------------------------------------------
@@ -375,7 +378,14 @@ export class GameClient {
     if (this.input.consumeInteract() && action && !this.dialogueOpen) {
       if (action.kind === 'talk') this.beginConversation(near.def);
       else if (action.kind === 'pickup') this._pickupCrate();
-      else if (action.kind === 'deliver') this._completeMission();
+      else if (action.kind === 'deliver') {
+        // Open the conversation FIRST so Maya's "you found it!" greeting
+        // fires while the stage still says CRATE, then complete the mission
+        // (her follow-up replies use the DONE knowledge; the completion
+        // screen sits behind the dialogue panel until the player closes it).
+        this.beginConversation(near.def);
+        this._completeMission();
+      }
     }
 
     const move = playing ? this.input.moveAxis() : { x: 0, y: 0 };

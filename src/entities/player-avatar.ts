@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import * as C from '../core/constants.js';
+import * as C from '../core/constants';
 
 /**
  * Third-person player controller around a REAL rigged GLB character
@@ -57,14 +57,22 @@ export class PlayerAvatar {
     const speedCap = running ? this.runCap : this.speedCap;
 
     // Horizontal wish-direction is camera-relative.
-    const right = new THREE.Vector3(forward.z, 0, -forward.x);
+    // right = forward rotated -90° about +y: (-fz, 0, fx).
+    // (E.g. facing north (0,0,-1), right must be east (+1,0,0).)
+    const right = new THREE.Vector3(-forward.z, 0, forward.x);
     const wish = new THREE.Vector3()
       .addScaledVector(forward, move.y)
       .addScaledVector(right, move.x);
     const moving = wish.lengthSq() > 1e-4;
     if (moving) {
       wish.normalize().multiplyScalar(speedCap);
-      this._facingYaw = Math.atan2(wish.x, wish.z);
+      // MODEL FORWARD AXIS: Soldier.glb faces LOCAL −z (verified by anatomy:
+      // toes reach −0.216 vs heel +0.122, calf mass on +z, face texels on −z).
+      // To point local (0,0,−1) along `wish` after rotation.y = θ:
+      //   rotY(θ)·(0,0,−1) = (−sinθ, 0, −cosθ) = wish
+      //   ⇒ θ = atan2(−wish.x, −wish.z)  (NOT atan2(wish.x, wish.z), which
+      //     assumes a +z-forward model and spun the character 180° off).
+      this._facingYaw = Math.atan2(-wish.x, -wish.z);
     }
 
     // Smooth horizontal velocity.

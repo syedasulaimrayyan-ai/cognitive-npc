@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { GameClient } from '../core/game-client.js';
+import { GameClient } from '../core/game-client';
 import { LoadingOverlay } from './LoadingOverlay.jsx';
 import { HUD } from './HUD.jsx';
 import { DialoguePanel } from './DialoguePanel.jsx';

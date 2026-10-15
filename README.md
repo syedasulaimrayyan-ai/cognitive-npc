@@ -1,123 +1,180 @@
-# COGNITIVE NPC
+# COGNITIVE NPC — THE MISSING SUPPLY
 
-A browser-only 3D third-person town built with **React + Three.js (WebGL)** and
-Vite. You walk a real rigged, animated character through a small textured town
-and strike up conversations with NPCs who have distinct personalities,
-persistent structured memories, and trust levels that change based on how you
-treat them.
+A browser-playable **third-person 3D town** built with **React + Three.js (Vite)**.
+You play a traveller arriving in the town of **Millbrook**, where a shopkeeper's
+supply crate has vanished. Ask questions, read people, and piece together what
+happened — every conversation is shaped by **persistent per-NPC memory, trust
+and strict knowledge boundaries**.
+
+```
+MISSION: FIND THE MISSING SUPPLY
+1. Talk to Maya Chen (market stall) about the missing crate.
+2. Question Rosa Delgado, who was dancing by the fountain all morning.
+3. Find the crate behind the old storehouse (east side of the street).
+4. Bring it back to Maya — the ending depends on how you treated everyone.
+```
+
+## Run it
 
 ```bash
 cd cognitive-npc
 npm install
-npm run dev        # open the printed URL (e.g. http://localhost:5173)
-npm run build      # optimized static site in dist/ — deployable anywhere
+npm run dev
 ```
 
-## Controls
+Open the printed URL (e.g. `http://localhost:5175`).
 
-- **Click** the game to capture the mouse (pointer lock). If the browser
-  refuses pointer lock (sandboxed iframe, kiosk policy), the game automatically
-  switches to **drag-to-look** mode and shows a hint — it never soft-locks you.
-- **WASD** move · **Shift** run · **Space** jump · **Mouse** look
-- Walk up to an NPC → **E** opens the dialogue panel · **Esc** releases the mouse
-- Dialogue panel: type and send, or use the **🎤** button for voice input.
+- Click to capture the mouse (pointer lock; if the browser refuses it —
+  sandboxed frames, policies — the game falls back to **drag-to-look**).
+- **WASD** move · **Shift** run · **Space** jump · **mouse** look
+- **E** interact / talk / pick up / deliver · **Esc** pause
+- Type to NPCs in the dialogue panel (or use the mic button for browser STT).
 
-## Architecture
+`npm run build && npm run preview` produces an optimized production bundle.
+
+## Project structure (live code)
 
 ```
 cognitive-npc/
-├── index.html
-├── vite.config.js                  # @vitejs/plugin-react
+├── index.html                  # entry page
+├── scripts/mock-llm.mjs        # LOCAL test double for the AI endpoint (dev only)
 ├── public/assets/
-│   ├── characters/                 # Soldier.glb, Xbot.glb, Michelle.glb (MIT)
-│   └── textures/                   # Poly Haven CC0 1K JPG PBR maps
+│   ├── characters/*.glb        # rigged characters with real animation clips
+│   └── textures/*.jpg          # PBR maps (Poly Haven CC0)
 └── src/
-    ├── main.jsx                    # React entry
-    ├── ui/App.jsx                  # shell: mounts GameClient, renders React UI
-    ├── ui/HUD.jsx                  # crosshair, interaction prompt, pause overlay
-    ├── ui/DialoguePanel.jsx        # chat log, trust/memory readout, mic button
-    ├── ui/LoadingOverlay.jsx       # real asset-loading progress
-    ├── core/game-client.js         # imperative Three.js orchestrator (main loop)
-    ├── core/constants.js           # NPCs, verified GLB clip names, controls
-    ├── core/asset-loader.js        # GLTFLoader + textures; fails loudly if missing
-    ├── core/environment.js         # town: roads, buildings, trees, lamps, plaza
-    ├── core/collision.js           # uniform-grid AABB collision (player + NPCs)
-    ├── core/camera-rig.js          # third-person orbit camera w/ wall occlusion
-    ├── core/input.js               # keyboard/mouse, pointer-lock + fallback
-    ├── entities/player-avatar.js   # Soldier: Idle/Walk/Run blend via AnimationMixer
-    ├── entities/npc-avatar.js      # Xbot/Michelle: idle loops + gesture clips
-    ├── ai/dialogue-engine.js       # drives one conversation per NPC
-    ├── ai/cognitive/memory.js      # MemoryStore: events + trust, localStorage-persisted
-    ├── ai/cognitive/persona.js     # personas derived from constants.NPCS
-    └── ai/voice/voice-io.js        # mic permission flow, Web STT/TTS + API-TTS seam
+    ├── main.jsx                # React entry → ui/App.jsx
+    ├── core/
+    │   ├── game-client.js      # orchestrator: scene, loop, mission wiring, HUD sync
+    │   ├── environment.js      # town: terrain, roads, buildings, plaza, lights, sky
+    │   ├── asset-loader.js     # GLB + texture loading (throws loudly on missing assets)
+    │   ├── camera-rig.js       # third-person camera with wall occlusion
+    │   ├── collision.js        # uniform-grid AABB world collision
+    │   ├── input.js            # keyboard/mouse, pointer-lock + drag fallback
+    │   └── constants.js        # world layout, NPC identities, mission geography, STAGE
+    ├── entities/
+    │   ├── player-avatar.js    # rigged player: mixer blending Idle/Walk/Run, gravity, jump
+    │   └── npc-avatar.js       # rigged NPCs: idle loop, look-at, gesture clips, tinting
+    ├── game/
+    │   ├── mission.js          # "THE MISSING SUPPLY" state machine (persisted)
+    │   └── mission-props.js    # crate, old storehouse, market stalls, arch, beacon
+    ├── ai/
+    │   ├── dialogue-engine.js  # conversation driver: prompt assembly, provider calls
+    │   ├── cognitive/
+    │   │   ├── memory.js       # persistent structured memory + retrieval + trust
+    │   │   ├── persona.js      # persona index
+    │   │   └── knowledge.js    # intents, knowledge boundaries, offline conversation
+    │   └── voice/voice-io.js   # Web Speech STT + speechSynthesis TTS
+    └── ui/                     # React: App, HUD (tracker/completion), DialoguePanel…
 ```
 
-React never touches the scene graph: `GameClient` pushes small state slabs
-(HUD payload, dialogue payload) up through callbacks; input flows down through
-method calls.
+> Older pre-React files (`src/main.js`, `src/world/`, `src/player/`, `src/npc/`,
+> `src/ui/dialogue.js`) are **not** in the build graph — kept on disk only as
+> project history; the entry page loads `src/main.jsx`.
 
-## Real assets and licenses
+## The cognitive layer (the point of the project)
 
-| Asset | Source | License |
-| --- | --- | --- |
-| `Soldier.glb` (player; Idle/Walk/Run clips) | [three.js examples](https://github.com/mrdoob/three.js/tree/dev/examples/models/gltf) | MIT |
-| `Xbot.glb` (Maya & Victor; idle + agree/headShake clips) | three.js examples | MIT |
-| `Michelle.glb` (Rosa; SambaDance clip) | three.js examples | MIT |
-| grass / asphalt / asphalt_normal / concrete / brick / plaster (1K JPG) | [Poly Haven](https://polyhaven.com) | CC0 |
+Each NPC has:
 
-All characters are genuinely rigged skinned meshes driven by
-`THREE.AnimationMixer` with cross-fades — no capsule stand-ins, no fake
-animations. The asset loader **throws** (visible in the loading screen) if a
-file or a required clip goes missing rather than substituting anything.
+- **Persona** — name, role, personality, speaking style, voice pitch.
+- **Persistent memory** — `MemoryStore` writes events (with salience + keywords),
+  trust (−100…+100), relationships and the conversation log to `localStorage`
+  (`cnpc2.memory.<npcId>`). Survives reloads. Retrieval (recency × salience ×
+  keyword match) feeds the LLM system prompt on every turn.
+- **Trust** — kindness raises it, insults and accusations cost it. The same
+  sentence lands differently at trust −24 than at +12.
+- **Knowledge boundaries** — `knowledge.js` states, per NPC and per mission
+  stage, what they KNOW and what they explicitly DO NOT KNOW. The witness saw
+  *where* the crate went, not *why*; nobody knows what's inside a crate they
+  never opened; Maya wasn't in the square, so she never claims to have seen
+  anything. These facts are injected into the model prompt **and** drive the
+  offline replies — a real model can't just "know everything".
+- **Decision memory** — the mission records your choices (accusing Victor,
+  telling Rosa why you're worried, finding the crate unaided…) and both NPC
+  dialogue and the ending epilogue branch on them.
 
-## What is real vs. deliberately unfinished
+Mission state persists too (`cnpc2.mission`), so reloading mid-quest resumes
+where you left off.
 
-| Feature | Status |
-| --- | --- |
-| Third-person camera, WASD run jump, collision | **real** — verified in-browser, incl. camera wall-occlusion pull-in |
-| GLB characters + animation blending | **real** — Idle/Walk/Run cross-fades, blend by speed |
-| Town with PBR textures, fog, sky, shadows | **real** — procedural layout, ~100 textured buildings + props |
-| NPC interaction, distinct personas | **real** — Maya (botanist), Victor (handyman), Rosa (dancer) |
-| Structured memory + trust | **real** — `MemoryStore` persists per-NPC events, trust, conversation log to `localStorage` (`cnpc2.memory.<id>`); memories are retrieved (recency × salience × keywords) into the LLM system prompt **before every reply** |
-| Memory-driven reactions | **real** — greeting vs. reunion, kind words raise trust, insults lower it, replies change tone by trust band; verified across reloads |
-| AI model conversation | **interface + working provider** — placeholder replies are **clearly badged in the UI** until you configure an OpenAI-compatible endpoint (see below) |
-| Microphone / speech-to-text | **real browser Web Speech API** with an explicit `getUserMedia` permission step; permission denials and recognition failures surface as visible error messages in the panel (verified: denied mic → readable error; sandboxed iframe → visible "network" STT error instead of silence) |
-| Text-to-speech | **real browser `speechSynthesis`** with per-persona pitch (verified queuing). A hosted neural-TTS provider is **not integrated** — the seam exists in `voice-io.js`, and nothing fake is ever played |
-| Jump animation | **honest stand-in** — Soldier.glb has no jump clip, so the model holds a frozen walk pose while airborne (documented, not faked) |
-| Turn animations | **not in assets** — turning is smooth quaternion facing; the GLBs contain no turn clips |
-| Level-of-detail system | **not implemented** — the map is small (~200 m) with few draw calls, so no LOD was needed yet |
+### Verifiable behaviours in the shipped game
 
-## Connecting a real conversational model
+- Ask Maya about the crate → she tells her story and points you to Rosa.
+- Ask Rosa what she saw → the clue's warmth depends on trust and whether you
+  told her Maya is worried; rude? you get the curt version (location still
+  given — the mission can't soft-lock).
+- Accuse Victor **once** → flat denial + trust −6. Accuse him **twice** → he
+  loses his temper and confesses *moving* the crate (and that he didn't steal
+  it). Ask politely with earned trust, or after the crate is recovered, and he
+  comes clean earlier.
+- Find the crate before anyone told you → recorded; Rosa is personally
+  offended ("you found it WITHOUT me?").
+- Four distinct endings (clean return, air cleared, cloud of suspicion, rough
+  return) chosen from accumulated decisions.
 
-Any endpoint speaking the OpenAI `/chat/completions` shape works (OpenAI,
-OpenRouter, LM Studio, Ollama, llama.cpp server). In the browser console:
+## AI conversation
+
+Any endpoint speaking the OpenAI `/chat/completions` shape works (LM Studio,
+Ollama `/v1`, llama.cpp, OpenRouter…). In the browser console:
 
 ```js
 localStorage.setItem('cnpc.llm', JSON.stringify({
   endpoint: 'http://localhost:1234/v1/chat/completions',
   model:    'model-id-your-server-expects',
-  key:      '' // bearer token for hosted APIs (or leave '' for local servers)
+  key:      ''   // bearer token for hosted APIs; blank for local servers
 }));
-// reload the page
+location.reload();
 ```
 
-**No API keys are hardcoded anywhere in this repo.** A key stored in
-`localStorage` only ever leaves the browser as an `Authorization` header to the
-endpoint *you* configured; for production, put the key behind a tiny server
-proxy instead and point `endpoint` at the proxy.
+What the model receives each turn: persona + speaking style, trust + attitude,
+retrieved memories, recent dialogue history, and the NPC's **stage-aware
+knowledge facts** (know / does-not-know).
 
-> Remote hosted endpoints are often blocked by browser CORS — a local model
-> server or a small proxy is the simplest path.
+**If no model is configured** (or the endpoint fails mid-conversation), the
+game stays fully playable: replies come from `knowledge.js` — in-character,
+mission-aware, trust- and decision-driven — and every line is badged
+`placeholder` in the UI with the provider state in the status strip. Failures
+show a visible error first, then the offline fallback. No API keys ever ship
+in browser code.
 
-## Honest limitations
+For a local test double of the endpoint: `node scripts/mock-llm.mjs`.
 
-- Buildings are textured boxes with window bands — stylized, not modeled
-  architecture; there is no interior geometry.
-- Web Speech STT needs Chrome/Edge and Google's speech service; other browsers
-  show a visible "not supported" error on the mic button.
-- Rosa's idle is Michelle.glb's SambaDance clip (her dancer persona matches it;
-  the file contains no other clip).
-- Victor and Maya share Xbot.glb; Victor is differentiated by a darker garment
-  tint applied to cloned materials (skin tones left natural).
-- The dev preview inside a sandboxed iframe cannot pointer-lock; the game
-  detects that and falls back to drag-to-look with an on-screen hint.
+### Voice
+
+- **STT**: Web Speech API (`mic` button) — needs Chrome/Edge; permission
+  denial and recognition errors surface visibly in the panel.
+- **TTS**: `speechSynthesis`, pitch varies per persona — real and working.
+- **Hosted neural TTS/STT**: an unwired seam (`cnpc.tts` config key) — not
+  integrated, and nothing fakes it.
+
+## Assets & licences
+
+| Asset | Source | Licence |
+| --- | --- | --- |
+| Soldier / Xbot / Michelle GLBs | three.js example assets | MIT |
+| grass, asphalt, concrete, brick, plaster, **wood_planks** (diff/normal/rough) | Poly Haven (1K) | CC0 |
+
+The loader **throws** if any required file or clip is missing — no silent
+fallbacks, no cube stand-ins for characters.
+
+## Known limits (honest list)
+
+- Buildings are procedurally massed boxes with PBR facades, roofs and window
+  bands — detailed enough to read as a town, not photoreal modular buildings.
+- Player clips are Idle/Walk/Run only: jumping holds a frozen walk pose (no
+  jump clip exists in Soldier.glb), and turns are slerped rather than played
+  as turn animations.
+- NPCs idle + look-at + one-shot gestures; no lip-sync or facial animation
+  (not claimed anywhere in the UI).
+- No LOD system — the map is ~200 m; shadows use one 2048² cascade, pixel
+  ratio capped at 1.5 (≈110 draw calls, ~65k triangles — smooth on desktop
+  GPUs).
+- Web STT needs Chrome/Edge; hosted neural voices are an unwired seam.
+
+## Resetting
+
+```js
+// in the browser console
+Object.keys(localStorage).filter(k => k.startsWith('cnpc')).forEach(k => localStorage.removeItem(k));
+location.reload();
+```
+
+This clears every NPC's memory, trust and the mission state — a clean first run.

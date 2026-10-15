@@ -6,7 +6,8 @@
   "description": "Browser-playable 3D third-person prototype with a conversational NPC and a modular AI/dialogue architecture.",
   "scripts": {
     "dev": "vite --host",
-    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc && vite build",
     "preview": "vite preview --host"
   },
   "dependencies": {
@@ -15,7 +16,11 @@
     "three": "^0.170.0"
   },
   "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@types/three": "^0.170.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.9.3",
     "vite": "^5.4.0"
   }
 }

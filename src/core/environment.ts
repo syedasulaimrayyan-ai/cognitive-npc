@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import * as C from './constants.js';
+import * as C from './constants';
 
 /** Gradient sky dome (cheap, atmospheric). */
 export class SkyDome {

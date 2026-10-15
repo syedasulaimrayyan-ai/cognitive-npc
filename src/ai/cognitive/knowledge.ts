@@ -17,7 +17,7 @@
  * NOTE: mission.js imports THIS file, so nothing here imports mission.js.
  * `ctx` is plain data: { stage, decisions, trust, reunion, memCount }.
  */
-import { STAGE } from '../../core/constants.js';
+import { STAGE } from '../../core/constants';
 
 // ---------------------------------------------------------------------------
 // 1. Intent classification (what the player said)
@@ -26,7 +26,7 @@ import { STAGE } from '../../core/constants.js';
 const RULES = [
   ['crate', /\b(crate|box|supply|supplies|shipment|missing|lost|stolen|steal|theft|thief|took|disappear\w*|order|what happened|any news|where is it|where'd it go)\b/],
   ['witness', /\b(saw|see|seen|witness\w*|notice\w*|clue|happen\w*|this morning|earlier (today|on)|watch\w*|did you watch|anything odd|anything strange|anything unusual|any idea)\b/],
-  ['accuse', /\b(victor|handyman|he|him|that man)\b[^?.]{0,40}\b(took|stole|steal|stolen|grabbed|pinched|guilty|thief|suspicious|accuse\w*|blame)\b|\b(did you take|did you steal|you took|you stole|you moved it|you're the thief|are the thief|accuse)\b/],
+  ['accuse', /\b(victor|handyman|he|him|that man)\b[^?.]{0,40}\b(took|stole|steal|stolen|grabbed|pinched|guilty|thief|suspicious|accuse\w*|blame)\b|\b(did you take|did you steal|you took|you stole|you moved it|you're the thief|are the thief|accuse|admit it|admit the truth|stop lying|you('re| are) lying|confess)\b/],
   ['tellwitness', /\b(maya|shopkeeper)\b[^?.]{0,40}\b(worried|concerned|missing|lost|looking for|searching|sent me|asking about|upset)\b|\b(told|telling)\b[^?.]{0,20}\bmaya\b/],
   ['why', /\bwhy\b/],
   ['contents', /\b(inside|inside it|contain\w*|what was in|what's in|what is in)\b/],
@@ -50,9 +50,11 @@ export function classifyIntent(text) {
 // ---------------------------------------------------------------------------
 
 /** Victor only comes clean under specific, documented conditions:
- *  crate already recovered (stage), earned trust, or pressed twice. */
+ *  crate already recovered (stage), earned trust, or already accused once
+ *  (ctx counts accusations PRIOR to the line being answered — so the SECOND
+ *  accusation is the one that snaps him). */
 export function victorAdmits({ stage, trust, accusations = 0 }) {
-  return stage >= STAGE.CRATE || trust >= 15 || accusations >= 2;
+  return stage >= STAGE.CRATE || trust >= 15 || accusations >= 1;
 }
 
 function factsFor(npcId, ctx) {

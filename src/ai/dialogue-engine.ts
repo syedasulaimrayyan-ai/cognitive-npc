@@ -1,7 +1,7 @@
-import { NPCS } from '../core/constants.js';
-import { MemoryStore } from './cognitive/memory.js';
-import { personaFor } from './cognitive/persona.js';
-import { classifyIntent, promptFacts, fallbackReply, greetingLine } from './cognitive/knowledge.js';
+import { NPCS } from '../core/constants';
+import { MemoryStore } from './cognitive/memory';
+import { personaFor } from './cognitive/persona';
+import { classifyIntent, promptFacts, fallbackReply, greetingLine } from './cognitive/knowledge';
 
 const CONFIG_KEY = 'cnpc.llm';
 
@@ -161,11 +161,12 @@ export class DialogueEngine {
       // 1. What did the player actually say/do? (mission reacts to THIS, not
       //    to the model's paraphrase — real models can dodge, fallback can't.)
       const intents = classifyIntent(text);
-      const ctxBefore = this._missionCtx();
+      // Knowledge snapshot BEFORE the mission reacts: a reply is based on what
+      // the NPC knew when asked (fresh flags shape the NEXT exchange).
+      const ctx = this._missionCtx();
       if (intents.size) {
         this.hooks.onWorldEvent?.('dialogue', { npcId: this.def.id, intents: [...intents] });
       }
-      const ctx = this._missionCtx(); // post-event (stage/flags may have moved)
 
       // 2. System prompt: persona + retrieved memories + knowledge boundaries.
       const systemPrompt = [
@@ -191,7 +192,7 @@ export class DialogueEngine {
           npcId: this.def.id,
           persona: this.persona,
           intents,
-          missionCtx: ctxBefore,
+          missionCtx: ctx,
         },
       );
 
@@ -221,6 +222,13 @@ export class DialogueEngine {
 
   /** Memory-driven reaction to what the player said (intent-based). */
   _applyReaction(playerText, reply, intents = classifyIntent(playerText)) {
+    if (intents.has('accuse')) {
+      // Pointing a finger costs trust with the person you point it at —
+      // Victor's confession gate (knowledge.victorAdmits: 2nd accusation)
+      // still fires, but the relationship takes real damage.
+      this.memory.adjustTrust(-6);
+      this.memory.addEvent('accusation', `Player accused someone of taking the crate: "${playerText.slice(0, 90)}"`, 5, ['accusation', 'victor', 'crate']);
+    }
     if (intents.has('insult')) {
       this.memory.adjustTrust(-5);
       this.memory.addEvent('offense', `Player was rude: "${playerText}"`, 4, ['offense']);
