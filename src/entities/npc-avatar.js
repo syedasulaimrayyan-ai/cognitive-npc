@@ -6,13 +6,36 @@ import * as THREE from 'three';
  * gesture animations during conversations. No static mannequin stand-ins.
  */
 export class NPCAvatar {
-  constructor(loader, { modelKey, idleClip, gestureClips = [], scale = 1 }) {
+  constructor(loader, { modelKey, idleClip, gestureClips = [], scale = 1, tint = null }) {
     const source = loader.instantiate(modelKey);
     this.root = source;
     this.root.scale.setScalar(scale);
     this.root.traverse((o) => {
       if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
     });
+
+    // Optional per-NPC tint (Victor vs Maya share Xbot.glb): clone materials
+    // first so the shared source GLB and other instances stay untouched, and
+    // tint only the darker garments — skin tones stay natural.
+    if (tint != null) {
+      const tintColor = new THREE.Color(tint);
+      const hsl = {};
+      const tintable = (m) => {
+        if (!m.color) return false;
+        m.color.getHSL(hsl, THREE.SRGBColorSpace);
+        return hsl.l < 0.62; // bright materials are skin/eyes — leave them be
+      };
+      const apply = (m) => {
+        const c = m.clone();
+        if (tintable(c)) c.color.lerp(tintColor, 0.6);
+        return c;
+      };
+      this.root.traverse((o) => {
+        if (o.isMesh && o.material) {
+          o.material = Array.isArray(o.material) ? o.material.map(apply) : apply(o.material);
+        }
+      });
+    }
 
     this.mixer = new THREE.AnimationMixer(source);
     this.idle = this.mixer.clipAction(loader.clip(modelKey, idleClip));

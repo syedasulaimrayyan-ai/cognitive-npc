@@ -9,6 +9,10 @@ const TEXTURES = [
   { key: 'concrete', file: 'concrete.jpg' },
   { key: 'brick', file: 'brick.jpg' },
   { key: 'plaster', file: 'plaster.jpg' },
+  // Crate + market woodwork (Poly Haven CC0, same source as the rest)
+  { key: 'wood', file: 'wood_planks_diff_1k.jpg' },
+  { key: 'wood_normal', file: 'wood_planks_nor_gl_1k.jpg' },
+  { key: 'wood_rough', file: 'wood_planks_rough_1k.jpg' },
 ];
 
 const GLBS = Object.entries({

@@ -1,0 +1,27 @@
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ai/dialogue-engine.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/asset-loader.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/camera-rig.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/constants.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/environment.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/game-client.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/input.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/entities/npc-avatar.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/entities/player-avatar.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ui/App.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ui/HUD.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ui/ui.css', LF will be replaced by CRLF the next time Git touches it
+ README.md                     | 169 [32m++++++++++++++++++[m[31m--------------[m
+ src/ai/dialogue-engine.js     | 127 [32m++++++++++++++++++[m[31m------[m
+ src/core/asset-loader.js      |   4 [32m+[m
+ src/core/camera-rig.js        |  33 [32m+++++[m[31m--[m
+ src/core/constants.js         |  32 [32m++++[m[31m--[m
+ src/core/environment.js       |  16 [32m+++[m
+ src/core/game-client.js       | 223 [32m+++++++++++++++++++++++++++++++++++++++[m[31m---[m
+ src/core/input.js             |  16 [32m++[m[31m-[m
+ src/entities/npc-avatar.js    |  25 [32m++++[m[31m-[m
+ src/entities/player-avatar.js |   4 [32m+[m[31m-[m
+ src/ui/App.jsx                |   1 [32m+[m
+ src/ui/HUD.jsx                |  77 [32m++++++++++++++[m[31m-[m
+ src/ui/ui.css                 |  72 [32m+++++++++++++[m[31m-[m
+ 13 files changed, 660 insertions(+), 139 deletions(-)

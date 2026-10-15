@@ -3,6 +3,10 @@ export class Input {
     this.dom = domElement;
     this.keys = new Set();
     this.pointerLocked = false;
+    // Fallback mode: when the browser refuses pointer lock (sandboxed iframe,
+    // kiosk policies), the player can still look around by dragging the mouse.
+    this.fallbackLook = false;
+    this.dragging = false;
     this.mouseDX = 0;
     this.mouseDY = 0;
     // One-shot edge events consumed once per frame.
@@ -23,10 +27,20 @@ export class Input {
       if (!this.pointerLocked) this.keys.clear();
     });
     document.addEventListener('mousemove', (e) => {
-      if (!this.pointerLocked) return;
+      // Pointer lock: always accumulate. Fallback: only while dragging.
+      if (!this.pointerLocked && !(this.fallbackLook && this.dragging)) return;
       this.mouseDX += e.movementX;
       this.mouseDY += e.movementY;
     });
+    window.addEventListener('mousedown', (e) => {
+      if (this.fallbackLook && e.button === 0 && e.target === this.dom) this.dragging = true;
+    });
+    window.addEventListener('mouseup', () => { this.dragging = false; });
+  }
+
+  /** Whether gameplay input (movement/look) should be processed at all. */
+  get active() {
+    return this.pointerLocked || this.fallbackLook;
   }
 
   moveAxis() {

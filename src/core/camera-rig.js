@@ -21,7 +21,12 @@ export class CameraRig {
     return new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
   }
 
-  update(targetPos, dt, clearOfGeoms = []) {
+  /**
+   * @param clearOfBoxes THREE.Box3[] static blockers (buildings, trees, lamps,
+   *   fountain). The camera pulls in when one sits between the head and the
+   *   desired orbit position, so it never ends up inside a wall.
+   */
+  update(targetPos, dt, clearOfBoxes = []) {
     this.target.lerp(
       this._desired.set(targetPos.x, targetPos.y + 1.55, targetPos.z),
       1 - Math.pow(0.0002, dt),
@@ -34,15 +39,23 @@ export class CameraRig {
       Math.cos(this.yaw) * cp * d,
     );
     const desiredPos = this.target.clone().add(offset);
-    // Pull the camera in if any geometry raycast hits between head/target.
-    for (const g of clearOfGeoms) {
-      const dir = desiredPos.clone().sub(this.target).normalize();
-      const ray = new THREE.Ray(this.target, dir);
-      const hit = ray.intersectBox(new THREE.Box3().setFromObject(g), new THREE.Vector3());
-      if (hit) {
-        const dist = hit.distanceTo(this.target);
-        if (dist < d) {
-          desiredPos.copy(this.target).addScaledVector(dir, Math.max(1.2, dist - 0.35));
+    // Pull the camera in if any blocker intersects head → camera ray.
+    if (clearOfBoxes.length) {
+      const dir = desiredPos.clone().sub(this.target);
+      const len = dir.length();
+      if (len > 1e-4) {
+        dir.multiplyScalar(1 / len);
+        const ray = this._ray ?? (this._ray = new THREE.Ray());
+        ray.origin.copy(this.target);
+        ray.direction.copy(dir);
+        const hit = this._hit ?? (this._hit = new THREE.Vector3());
+        for (const box of clearOfBoxes) {
+          if (!ray.intersectBox(box, hit)) continue;
+          const dist = hit.distanceTo(this.target);
+          if (dist < len && dist < d) {
+            desiredPos.copy(this.target).addScaledVector(dir, Math.max(1.2, dist - 0.35));
+            break;
+          }
         }
       }
     }

@@ -25,6 +25,7 @@ export function App() {
       onDialogue: setDialogue,
     });
     clientRef.current = client;
+    window.__game = client; // debug/verification handle (read-only use)
     client.start();
     return () => client.dispose();
   }, []);

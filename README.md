@@ -1,96 +1,123 @@
-# Cognitive NPC — 3D Third-Person Prototype
+# COGNITIVE NPC
 
-A small browser-playable 3D town built with **Three.js** (ES modules + Vite).
-You walk a third-person character through a procedurally generated town and can
-walk up to a townsperson NPC and start a text conversation.
-
-```
-cognitive-npc/
-├── index.html                  # entry page (HUD + dialogue panel markup)
-├── vite.config.js
-├── package.json
-└── src/
-    ├── main.js                 # bootstraps the Game loop
-    ├── core/game.js            # renderer, camera, wiring, main loop
-    ├── world/town.js           # procedural town: roads, buildings, trees, lighting
-    ├── player/player.js        # humanoid mesh, WASD movement, orbital camera
-    ├── npc/npc.js              # interactable NPC with idle animation
-    ├── npc/memory.js           # structured, persistent NPC memory (events + trust)
-    ├── ai/llm.js               # modular conversational-provider interface
-    ├── ai/voice.js             # hook-points for mic / STT / TTS (NOT implemented)
-    └── ui/{dialogue,hud,ui.css}
-```
-
-## Run it
+A browser-only 3D third-person town built with **React + Three.js (WebGL)** and
+Vite. You walk a real rigged, animated character through a small textured town
+and strike up conversations with NPCs who have distinct personalities,
+persistent structured memories, and trust levels that change based on how you
+treat them.
 
 ```bash
 cd cognitive-npc
 npm install
-npm run dev
+npm run dev        # open the printed URL (e.g. http://localhost:5173)
+npm run build      # optimized static site in dist/ — deployable anywhere
 ```
 
-Open the printed URL (usually `http://localhost:5173`).
+## Controls
 
-- Click anywhere → game captures the mouse (pointer lock).
-- **WASD** move · **Shift** run · **mouse** look
-- Walk up to the NPC standing in the plaza → **E** opens the dialogue panel.
-- **Esc** closes the panel / releases the mouse.
+- **Click** the game to capture the mouse (pointer lock). If the browser
+  refuses pointer lock (sandboxed iframe, kiosk policy), the game automatically
+  switches to **drag-to-look** mode and shows a hint — it never soft-locks you.
+- **WASD** move · **Shift** run · **Space** jump · **Mouse** look
+- Walk up to an NPC → **E** opens the dialogue panel · **Esc** releases the mouse
+- Dialogue panel: type and send, or use the **🎤** button for voice input.
 
-`npm run build && npm run preview` produces an optimized production bundle.
+## Architecture
 
-Performance notes: everything is procedural (no asset downloads), Lambert materials,
-one shadow-casting light with a bounded shadow frustum, pixel ratio capped at 1.5,
-and geometry is modest (~300 meshes). It runs comfortably on integrated GPUs.
+```
+cognitive-npc/
+├── index.html
+├── vite.config.js                  # @vitejs/plugin-react
+├── public/assets/
+│   ├── characters/                 # Soldier.glb, Xbot.glb, Michelle.glb (MIT)
+│   └── textures/                   # Poly Haven CC0 1K JPG PBR maps
+└── src/
+    ├── main.jsx                    # React entry
+    ├── ui/App.jsx                  # shell: mounts GameClient, renders React UI
+    ├── ui/HUD.jsx                  # crosshair, interaction prompt, pause overlay
+    ├── ui/DialoguePanel.jsx        # chat log, trust/memory readout, mic button
+    ├── ui/LoadingOverlay.jsx       # real asset-loading progress
+    ├── core/game-client.js         # imperative Three.js orchestrator (main loop)
+    ├── core/constants.js           # NPCs, verified GLB clip names, controls
+    ├── core/asset-loader.js        # GLTFLoader + textures; fails loudly if missing
+    ├── core/environment.js         # town: roads, buildings, trees, lamps, plaza
+    ├── core/collision.js           # uniform-grid AABB collision (player + NPCs)
+    ├── core/camera-rig.js          # third-person orbit camera w/ wall occlusion
+    ├── core/input.js               # keyboard/mouse, pointer-lock + fallback
+    ├── entities/player-avatar.js   # Soldier: Idle/Walk/Run blend via AnimationMixer
+    ├── entities/npc-avatar.js      # Xbot/Michelle: idle loops + gesture clips
+    ├── ai/dialogue-engine.js       # drives one conversation per NPC
+    ├── ai/cognitive/memory.js      # MemoryStore: events + trust, localStorage-persisted
+    ├── ai/cognitive/persona.js     # personas derived from constants.NPCS
+    └── ai/voice/voice-io.js        # mic permission flow, Web STT/TTS + API-TTS seam
+```
 
-## What is real vs. what is deliberately unfinished
+React never touches the scene graph: `GameClient` pushes small state slabs
+(HUD payload, dialogue payload) up through callbacks; input flows down through
+method calls.
+
+## Real assets and licenses
+
+| Asset | Source | License |
+| --- | --- | --- |
+| `Soldier.glb` (player; Idle/Walk/Run clips) | [three.js examples](https://github.com/mrdoob/three.js/tree/dev/examples/models/gltf) | MIT |
+| `Xbot.glb` (Maya & Victor; idle + agree/headShake clips) | three.js examples | MIT |
+| `Michelle.glb` (Rosa; SambaDance clip) | three.js examples | MIT |
+| grass / asphalt / asphalt_normal / concrete / brick / plaster (1K JPG) | [Poly Haven](https://polyhaven.com) | CC0 |
+
+All characters are genuinely rigged skinned meshes driven by
+`THREE.AnimationMixer` with cross-fades — no capsule stand-ins, no fake
+animations. The asset loader **throws** (visible in the loading screen) if a
+file or a required clip goes missing rather than substituting anything.
+
+## What is real vs. deliberately unfinished
 
 | Feature | Status |
 | --- | --- |
-| 3D town, player controller, third-person camera | **done** |
-| NPC with idle animation + interaction prompt | **done** |
-| Dialogue UI with typed replies | **done** |
-| **Persistent structured memory** | **real** — `MemoryStore` saves events + trust per NPC to `localStorage`, survives reloads |
-| **AI model conversation** | **interface only** — a working `OpenAICompatibleProvider` exists but needs you to point it at a server; without config the UI shows clearly labeled placeholder replies |
-| **Microphone / STT** | **scaffold only** — `VoiceIO` detects browser support but the mic button stays disabled and throwing |
-| **Text-to-speech** | **scaffold only** — `VoiceIO.speak()` is a no-op that logs |
-
-Nothing pretends to be finished: placeholder chat replies are badged, the status
-strip shows the provider state, and voice calls log "not implemented yet".
+| Third-person camera, WASD run jump, collision | **real** — verified in-browser, incl. camera wall-occlusion pull-in |
+| GLB characters + animation blending | **real** — Idle/Walk/Run cross-fades, blend by speed |
+| Town with PBR textures, fog, sky, shadows | **real** — procedural layout, ~100 textured buildings + props |
+| NPC interaction, distinct personas | **real** — Maya (botanist), Victor (handyman), Rosa (dancer) |
+| Structured memory + trust | **real** — `MemoryStore` persists per-NPC events, trust, conversation log to `localStorage` (`cnpc2.memory.<id>`); memories are retrieved (recency × salience × keywords) into the LLM system prompt **before every reply** |
+| Memory-driven reactions | **real** — greeting vs. reunion, kind words raise trust, insults lower it, replies change tone by trust band; verified across reloads |
+| AI model conversation | **interface + working provider** — placeholder replies are **clearly badged in the UI** until you configure an OpenAI-compatible endpoint (see below) |
+| Microphone / speech-to-text | **real browser Web Speech API** with an explicit `getUserMedia` permission step; permission denials and recognition failures surface as visible error messages in the panel (verified: denied mic → readable error; sandboxed iframe → visible "network" STT error instead of silence) |
+| Text-to-speech | **real browser `speechSynthesis`** with per-persona pitch (verified queuing). A hosted neural-TTS provider is **not integrated** — the seam exists in `voice-io.js`, and nothing fake is ever played |
+| Jump animation | **honest stand-in** — Soldier.glb has no jump clip, so the model holds a frozen walk pose while airborne (documented, not faked) |
+| Turn animations | **not in assets** — turning is smooth quaternion facing; the GLBs contain no turn clips |
+| Level-of-detail system | **not implemented** — the map is small (~200 m) with few draw calls, so no LOD was needed yet |
 
 ## Connecting a real conversational model
 
-Any HTTP endpoint that speaks the OpenAI `/chat/completions` shape works
-(OpenAI, OpenRouter, LM Studio `http://localhost:1234/v1/chat/completions`,
-Ollama's `/v1` route, llama.cpp server…). In the page's console:
+Any endpoint speaking the OpenAI `/chat/completions` shape works (OpenAI,
+OpenRouter, LM Studio, Ollama, llama.cpp server). In the browser console:
 
 ```js
 localStorage.setItem('cnpc.llm', JSON.stringify({
   endpoint: 'http://localhost:1234/v1/chat/completions',
   model:    'model-id-your-server-expects',
-  key:      '' // or a bearer token for hosted APIs
+  key:      '' // bearer token for hosted APIs (or leave '' for local servers)
 }));
-// then reload the page
+// reload the page
 ```
 
-What you get once connected:
-- A **system prompt built from real NPC memory** (`memory.buildPromptContext`)
-  describing the accumulated events and the current trust level.
-- Recent conversation history included automatically.
-- Trust drift: polite replies nudge `trust` up, hostile replies down; every
-  exchange is logged back into persistent memory.
+**No API keys are hardcoded anywhere in this repo.** A key stored in
+`localStorage` only ever leaves the browser as an `Authorization` header to the
+endpoint *you* configured; for production, put the key behind a tiny server
+proxy instead and point `endpoint` at the proxy.
 
-> Remote hosted endpoints will often be blocked by browser CORS — a local model
-> server (LM Studio / Ollama) or a tiny proxy is the simplest path for now.
+> Remote hosted endpoints are often blocked by browser CORS — a local model
+> server or a small proxy is the simplest path.
 
-## Where the AI hooks get plugged in next
+## Honest limitations
 
-| Step | Where |
-| --- | --- |
-| 1. Live dialogue model | swap the provider in `src/ai/llm.js` (`createProvider`) |
-| 2. Mic capture | implement `VoiceIO.listen()` — `getUserMedia` + `MediaRecorder` |
-| 3. Speech-to-text | Web Speech API or an external STT endpoint inside `VoiceIO` |
-| 4. Text-to-speech | `VoiceIO.speak()` via `speechSynthesis` or a TTS API |
-| 5. Richer memories | extend `MemoryStore` schema (goals, relationships, grievances) |
-
-Memory is already persisted and structured, so once a real model is connected
-it reads the same JSON the placeholder path writes.
+- Buildings are textured boxes with window bands — stylized, not modeled
+  architecture; there is no interior geometry.
+- Web Speech STT needs Chrome/Edge and Google's speech service; other browsers
+  show a visible "not supported" error on the mic button.
+- Rosa's idle is Michelle.glb's SambaDance clip (her dancer persona matches it;
+  the file contains no other clip).
+- Victor and Maya share Xbot.glb; Victor is differentiated by a darker garment
+  tint applied to cloned materials (skin tones left natural).
+- The dev preview inside a sandboxed iframe cannot pointer-lock; the game
+  detects that and falls back to drag-to-look with an on-screen hint.

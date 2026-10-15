@@ -99,7 +99,9 @@ export class PlayerAvatar {
     } else if (hs < 0.35) {
       this._crossfade('idle');
       this.clips.walk.timeScale = 1.0;
-    } else if (hs < speedCap * 0.75 && this._active !== 'run') {
+    } else if (hs < C.CONTROLS.runSpeed * 0.62 && this._active !== 'run') {
+      // Threshold keyed to RUN speed (not current cap) so normal walking
+      // always shows Walk — reaching full walk speed must not flip to Run.
       this._crossfade('walk');
       this.clips.walk.timeScale = Math.max(0.6, hs / C.CONTROLS.walkSpeed);
     } else {

@@ -112,6 +112,22 @@ export function buildEnvironment(scene, loader) {
   const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 
   function addBuilding(x, z, w, d, floors) {
+    // Keep the plaza, NPC spots, market, entrance and the mission storehouse
+    // clear of architecture — buildings must never swallow a spawn, a stall,
+    // or the crate-hiding corner.
+    const halfW = w / 2 + 0.6, halfD = d / 2 + 0.6;
+    const KEEPCLEAR = [
+      [0, 10],        // plaza fountain
+      [-10.1, 2],     // Maya behind her stall
+      [4, 8],         // Rosa by the fountain
+      [9, -18],       // Victor's work wall
+      [-8.5, 2], [-8.5, 6.5], [-8.5, -2.5], [-12.5, 2], // market stalls
+      [18, 24],       // old storehouse
+      [23.9, 24.6],   // the crate stack behind it
+    ];
+    const overlaps = (cx, cz) =>
+      Math.abs(x - cx) < halfW + 6 && Math.abs(z - cz) < halfD + 5;
+    if (KEEPCLEAR.some(([cx, cz]) => overlaps(cx, cz))) return;
     const h = floors * 3.1;
     const tex = palette[Math.floor(rand() * palette.length)].clone();
     tex.needsUpdate = true;
