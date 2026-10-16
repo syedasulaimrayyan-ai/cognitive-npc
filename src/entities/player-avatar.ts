@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import * as C from '../core/constants';
+import type { AssetLoader } from '../core/asset-loader';
+
+/** The three locomotion clips exposed by PlayerAvatar. */
+export type ClipName = 'idle' | 'walk' | 'run';
 
 /**
  * Third-person player controller around a REAL rigged GLB character
@@ -7,16 +11,35 @@ import * as C from '../core/constants';
  * are blended per-frame with AnimationMixer cross-fades; no capsule stand-ins.
  */
 export class PlayerAvatar {
-  constructor(loader, { clips, speedCap = C.CONTROLS.walkSpeed, runCap = C.CONTROLS.runSpeed }) {
+  root: THREE.Object3D;
+  mixer: THREE.AnimationMixer;
+  clips: Record<ClipName, THREE.AnimationAction>;
+  _active: ClipName;
+  velocity: THREE.Vector3;
+  position: THREE.Vector3;
+  ySpeed: number;
+  grounded: boolean;
+  speedCap: number;
+  runCap: number;
+  _facingYaw: number;
+
+  constructor(
+    loader: AssetLoader,
+    {
+      clips,
+      speedCap = C.CONTROLS.walkSpeed,
+      runCap = C.CONTROLS.runSpeed,
+    }: { clips: Record<ClipName, string>; speedCap?: number; runCap?: number },
+  ) {
     const source = loader.instantiate('player');
     this.root = source;
     this.root.scale.setScalar(1.0);
     this.root.traverse((o) => {
-      if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+      if (o instanceof THREE.Mesh) { o.castShadow = true; o.receiveShadow = true; }
     });
 
     this.mixer = new THREE.AnimationMixer(source);
-    const clipFor = (name) => loader.clip('player', name);
+    const clipFor = (name: string) => loader.clip('player', name);
     this.clips = {
       idle: this.mixer.clipAction(clipFor(clips.idle)),
       walk: this.mixer.clipAction(clipFor(clips.walk)),
@@ -38,7 +61,7 @@ export class PlayerAvatar {
     this._facingYaw = 0;
   }
 
-  _crossfade(to, fadeTime = 0.22) {
+  _crossfade(to: ClipName, fadeTime = 0.22) {
     if (this._active === to) return;
     const next = this.clips[to];
     next.reset().fadeIn(fadeTime).play();
@@ -53,7 +76,13 @@ export class PlayerAvatar {
    * @param jump       one-shot jump request
    * @param forward    world-space forward vector of the camera rig
    */
-  update(dt, move, running, jump, forward) {
+  update(
+    dt: number,
+    move: { x: number; y: number },
+    running: boolean,
+    jump: boolean,
+    forward: THREE.Vector3,
+  ) {
     const speedCap = running ? this.runCap : this.speedCap;
 
     // Horizontal wish-direction is camera-relative.
@@ -121,7 +150,7 @@ export class PlayerAvatar {
   }
 
   /** Corrected position (after collision), for game logic to copy back. */
-  syncPosition(corrected) {
+  syncPosition(corrected: THREE.Vector3) {
     this.position.x = corrected.x;
     this.position.z = corrected.z;
   }

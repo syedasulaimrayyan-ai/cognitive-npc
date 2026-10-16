@@ -14,11 +14,11 @@ import { STAGE } from '../core/constants';
 const KEY = 'cnpc2.mission';
 
 const OBJECTIVES = {
-  [STAGE.INTRO]: 'Ask Maya Chen about her missing supply crate.',
-  [STAGE.ASKED]: 'Question Rosa by the fountain — she was dancing here all morning.',
-  [STAGE.CLUE]: 'Find the crate behind the old storehouse (east side of the street).',
-  [STAGE.CRATE]: 'Bring the crate back to Maya at the market stall.',
-  [STAGE.DONE]: 'The crate is back. Millbrook owes you one.',
+  [STAGE.INTRO]: 'Find the market shopkeeper and get supplies.',
+  [STAGE.ASKED]: 'Talk to the shopkeeper about the needed supplies.',
+  [STAGE.CLUE]: 'Purchase the supply package from the shopkeeper.',
+  [STAGE.CRATE]: 'Deliver the supplies to the resident.',
+  [STAGE.DONE]: 'Supplies delivered successfully!',
 };
 
 // Decision flags, each shaped by a real player choice:
@@ -32,9 +32,34 @@ const DEFAULT_DECISIONS = {
   foundWithoutClue: false,  // crate found before Rosa was ever asked (Rosa offended)
   victimized: false,        // player insulted someone in the mission chain
   accusations: 0,           // times the player accused Victor (2 → he snaps)
+  boughtSupplies: false,    // bought mission supplies
+  deliveredSupplies: false, // delivered supplies to resident
 };
 
+/** Decision flags: named booleans + the accusation counter. */
+export interface MissionDecisions {
+  [flag: string]: any;
+  askedMaya: boolean;
+  toldRosaAboutMaya: boolean;
+  suspicionPlanted: boolean;
+  toldVictorAccused: boolean;
+  toldMayaVictor: boolean;
+  clueGiven: boolean;
+  foundWithoutClue: boolean;
+  victimized: boolean;
+  accusations: number;
+}
+
+export interface MissionState {
+  stage: number;
+  decisions: MissionDecisions;
+  completedAt: number | null;
+  epilogue: string | null;
+}
+
 export class Mission {
+  state: MissionState;
+
   constructor() {
     const loaded = this._load();
     this.state = loaded ?? {
@@ -45,7 +70,7 @@ export class Mission {
     };
   }
 
-  _load() {
+  _load(): MissionState | null {
     try {
       const raw = localStorage.getItem(KEY);
       if (!raw) return null;
@@ -64,7 +89,7 @@ export class Mission {
   get decisions() { return this.state.decisions; }
 
   /** Advance monotonically. Returns true if the stage actually changed. */
-  setStage(stage, { force = false } = {}) {
+  setStage(stage: number, { force = false }: { force?: boolean } = {}) {
     if (!force && stage <= this.state.stage) return false;
     this.state.stage = stage;
     this._save();
@@ -72,7 +97,7 @@ export class Mission {
   }
 
   /** Record a dialogue-derived decision. Returns true if newly set. */
-  decide(flag, value = true) {
+  decide(flag: string, value: boolean | number = true) {
     if (this.state.decisions[flag] === value) return false;
     this.state.decisions[flag] = value;
     this._save();
@@ -87,10 +112,10 @@ export class Mission {
    * @param {number} trust
    * @returns {{ stage: number, decisions: object, changed: boolean, notify?: string }}
    */
-  reactToDialogue(npcId, intents) {
+  reactToDialogue(npcId: string, intents: Set<string>) {
     const d = { ...this.state.decisions };
     let stage = this.state.stage;
-    const has = (i) => intents.has(i);
+    const has = (i: string) => intents.has(i);
     let notify;
 
     if (npcId === 'maya') {
@@ -129,6 +154,26 @@ export class Mission {
     this.state.decisions = d;
     this._save();
     return { stage: this.state.stage, decisions: this.state.decisions, changed, notify };
+  }
+
+  /** Called when supplies are bought. */
+  suppliesBought() {
+    this.decide('boughtSupplies', true);
+    if (this.state.stage < STAGE.CRATE) {
+      this.setStage(STAGE.CRATE);
+    }
+  }
+
+  /** Called when supplies delivered. */
+  suppliesDelivered() {
+    this.decide('deliveredSupplies', true);
+    this.setStage(STAGE.DONE);
+    if (!this.state.epilogue) {
+      this.state.epilogue = 'Supplies delivered successfully. Thank you for helping the village!';
+      this.state.completedAt = Date.now();
+      this._save();
+    }
+    return this.state.epilogue;
   }
 
   /** Called when the player physically picks up the crate. */

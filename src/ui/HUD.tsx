@@ -1,12 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { HudState } from '../core/game-client';
 
 /**
  * Game HUD: mission tracker (top-left), transient objective notices (toast),
  * interaction prompt, controls help, and the mission completion screen.
  * All state arrives as one snapshot from GameClient — React stays dumb.
  */
-export function HUD({ state, onResume }) {
-  const [noticeVisible, setNoticeVisible] = useState(null); // { id, text }
+export function HUD({ state, onResume }: {
+  state: HudState | null;
+  onResume: () => void;
+}) {
+  const [noticeVisible, setNoticeVisible] = useState<HudState['notice']>(null); // { id, text }
   const [completionDismissed, setCompletionDismissed] = useState(false);
 
   // Show each new notice for a few seconds.
@@ -23,7 +27,7 @@ export function HUD({ state, onResume }) {
   }, [state?.mission?.completedAt]);
 
   if (!state) return null;
-  const { pointerLocked, interaction, lookHint, mission, holdingCrate, notice } = state;
+  const { pointerLocked, interaction, lookHint, mission, holdingCrate } = state;
 
   return (
     <>

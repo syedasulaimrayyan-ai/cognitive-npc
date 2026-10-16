@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { AssetLoader } from '../core/asset-loader';
 
 /**
  * NPC built from a REAL rigged GLB. Plays its idle clip on loop forever and,
@@ -6,12 +7,33 @@ import * as THREE from 'three';
  * gesture animations during conversations. No static mannequin stand-ins.
  */
 export class NPCAvatar {
-  constructor(loader, { modelKey, idleClip, gestureClips = [], scale = 1, tint = null }) {
+  root: THREE.Object3D;
+  mixer: THREE.AnimationMixer;
+  idle: THREE.AnimationAction;
+  gestures: THREE.AnimationAction[];
+  _t: number;
+
+  constructor(
+    loader: AssetLoader,
+    {
+      modelKey,
+      idleClip,
+      gestureClips = [],
+      scale = 1,
+      tint = null,
+    }: {
+      modelKey: string;
+      idleClip: string;
+      gestureClips?: string[];
+      scale?: number;
+      tint?: string | number | null;
+    },
+  ) {
     const source = loader.instantiate(modelKey);
     this.root = source;
     this.root.scale.setScalar(scale);
     this.root.traverse((o) => {
-      if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+      if (o instanceof THREE.Mesh) { o.castShadow = true; o.receiveShadow = true; }
     });
 
     // Optional per-NPC tint (Victor vs Maya share Xbot.glb): clone materials
@@ -19,19 +41,20 @@ export class NPCAvatar {
     // tint only the darker garments — skin tones stay natural.
     if (tint != null) {
       const tintColor = new THREE.Color(tint);
-      const hsl = {};
-      const tintable = (m) => {
-        if (!m.color) return false;
-        m.color.getHSL(hsl, THREE.SRGBColorSpace);
+      const hsl = { h: 0, s: 0, l: 0 };
+      const tintable = (m: THREE.Material) => {
+        const color = (m as THREE.MeshStandardMaterial).color;
+        if (!color) return false;
+        color.getHSL(hsl, THREE.SRGBColorSpace);
         return hsl.l < 0.62; // bright materials are skin/eyes — leave them be
       };
-      const apply = (m) => {
+      const apply = (m: THREE.Material) => {
         const c = m.clone();
-        if (tintable(c)) c.color.lerp(tintColor, 0.6);
+        if (tintable(c)) (c as THREE.MeshStandardMaterial).color.lerp(tintColor, 0.6);
         return c;
       };
       this.root.traverse((o) => {
-        if (o.isMesh && o.material) {
+        if (o instanceof THREE.Mesh && o.material) {
           o.material = Array.isArray(o.material) ? o.material.map(apply) : apply(o.material);
         }
       });
@@ -51,7 +74,7 @@ export class NPCAvatar {
           return a;
         } catch { return null; } // optional clip — skip if absent
       })
-      .filter(Boolean);
+      .filter((a): a is THREE.AnimationAction => a !== null);
 
     // Gentle idle head sway (subtle secondary motion on the real skeleton via
     // mixer-controlled additive tweak, kept tiny and optional).
@@ -66,12 +89,12 @@ export class NPCAvatar {
     return true;
   }
 
-  update(dt) {
+  update(dt: number) {
     this.mixer.update(dt);
     this._t += dt;
   }
 
-  lookAt(x2, z2, dt) {
+  lookAt(x2: number, z2: number, dt: number) {
     const yaw = Math.atan2(x2 - this.root.position.x, z2 - this.root.position.z);
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0));
     this.root.quaternion.slerp(q, 1 - Math.pow(0.004, dt));

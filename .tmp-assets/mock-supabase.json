@@ -1,0 +1,153 @@
+{
+  "users": {
+    "688adde5-12a3-4f69-b602-a051b55461ae": {
+      "id": "688adde5-12a3-4f69-b602-a051b55461ae"
+    },
+    "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4": {
+      "id": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4"
+    },
+    "0490beed-828d-4b2f-89e4-95548300bde1": {
+      "id": "0490beed-828d-4b2f-89e4-95548300bde1"
+    },
+    "8555e81e-cdfe-43e8-a7c7-ab6948d67dd9": {
+      "id": "8555e81e-cdfe-43e8-a7c7-ab6948d67dd9"
+    },
+    "38dd774c-8156-47f5-9fab-cb945e35b22f": {
+      "id": "38dd774c-8156-47f5-9fab-cb945e35b22f"
+    },
+    "eb2c15cd-1a01-403e-bd08-ee7a98efe725": {
+      "id": "eb2c15cd-1a01-403e-bd08-ee7a98efe725"
+    }
+  },
+  "sessions": {
+    "mock-37efdafad226cb7aa56404bea3fbdaca": {
+      "userId": "688adde5-12a3-4f69-b602-a051b55461ae",
+      "refresh": "mockr-ad89a5fb8ef9f4061eaeff7d102657f6"
+    },
+    "r:mockr-ad89a5fb8ef9f4061eaeff7d102657f6": {
+      "userId": "688adde5-12a3-4f69-b602-a051b55461ae"
+    },
+    "mock-bee454f98b091ed3e001c0e7076d7b44": {
+      "userId": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4",
+      "refresh": "mockr-217f447eca0522324ac0b8181d068a08"
+    },
+    "r:mockr-217f447eca0522324ac0b8181d068a08": {
+      "userId": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4"
+    },
+    "mock-694a1a8d0a2be81595711e483cdd3b5a": {
+      "userId": "0490beed-828d-4b2f-89e4-95548300bde1",
+      "refresh": "mockr-e0b99f2f2bc328b5d3b900327a8930a1"
+    },
+    "r:mockr-e0b99f2f2bc328b5d3b900327a8930a1": {
+      "userId": "0490beed-828d-4b2f-89e4-95548300bde1"
+    },
+    "mock-07f80ad8a970bebab0ea583d594041c5": {
+      "userId": "8555e81e-cdfe-43e8-a7c7-ab6948d67dd9",
+      "refresh": "mockr-e784be551b0561b1b3e468b279242f19"
+    },
+    "r:mockr-e784be551b0561b1b3e468b279242f19": {
+      "userId": "8555e81e-cdfe-43e8-a7c7-ab6948d67dd9"
+    },
+    "mock-e6bd5c4268d82c098329483cca251f2a": {
+      "userId": "38dd774c-8156-47f5-9fab-cb945e35b22f",
+      "refresh": "mockr-78714565fbb35371452c59c2d85ace68"
+    },
+    "r:mockr-78714565fbb35371452c59c2d85ace68": {
+      "userId": "38dd774c-8156-47f5-9fab-cb945e35b22f"
+    },
+    "mock-993ea464e77b5038872fbf57ab674cf0": {
+      "userId": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4",
+      "refresh": "mockr-fe4bfb318af668a0b9ee338c8c05cb1f"
+    },
+    "r:mockr-fe4bfb318af668a0b9ee338c8c05cb1f": {
+      "userId": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4"
+    },
+    "mock-31e48a6173ce64fe3af45e08a82e921e": {
+      "userId": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4",
+      "refresh": "mockr-abfc7dcaa94ac77ed6dc6632e84ae1a2"
+    },
+    "r:mockr-abfc7dcaa94ac77ed6dc6632e84ae1a2": {
+      "userId": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4"
+    },
+    "mock-056326439541b6522006fa18f0b6711e": {
+      "userId": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4",
+      "refresh": "mockr-87e9bc3bf6a75c88bb27fae2901be827"
+    },
+    "r:mockr-87e9bc3bf6a75c88bb27fae2901be827": {
+      "userId": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4"
+    },
+    "mock-20adb0fdb905ba465b1105e6e9ef822a": {
+      "userId": "eb2c15cd-1a01-403e-bd08-ee7a98efe725",
+      "refresh": "mockr-f1856cc0b347d5aff012e79651413590"
+    },
+    "r:mockr-f1856cc0b347d5aff012e79651413590": {
+      "userId": "eb2c15cd-1a01-403e-bd08-ee7a98efe725"
+    }
+  },
+  "memories": [
+    {
+      "id": "5a018236-2348-4c2b-ab94-160871e26355",
+      "player_id": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4",
+      "npc_id": "maya",
+      "type": "identity",
+      "summary": "The player's name is Alex.",
+      "salience": 5,
+      "keywords": [
+        "name",
+        "identity"
+      ],
+      "created_at": "2026-10-15T22:38:44.934Z"
+    },
+    {
+      "id": "2f8bc1c1-b4d1-4ff7-81b2-6c45dd1c3cb2",
+      "player_id": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4",
+      "npc_id": "maya",
+      "type": "promise",
+      "summary": "Player promised: \"My name is Alex. I promise to help you find your missing supply crate.\"",
+      "salience": 5,
+      "keywords": [
+        "promise",
+        "crate",
+        "supply",
+        "help"
+      ],
+      "created_at": "2026-10-15T22:38:44.934Z"
+    },
+    {
+      "id": "f02c0303-f33d-4124-83c0-001fd20804b2",
+      "player_id": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4",
+      "npc_id": "maya",
+      "type": "event",
+      "summary": "Player admitted breaking their promise.",
+      "salience": 5,
+      "keywords": [
+        "promise",
+        "broke",
+        "lied"
+      ],
+      "created_at": "2026-10-15T22:45:35.313Z"
+    }
+  ],
+  "relationships": [
+    {
+      "player_id": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4",
+      "npc_id": "maya",
+      "trust": -6
+    },
+    {
+      "player_id": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4",
+      "npc_id": "victor",
+      "trust": 0
+    },
+    {
+      "player_id": "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4",
+      "npc_id": "rosa",
+      "trust": 2
+    }
+  ],
+  "players": {
+    "7f7abe58-8a9d-46df-863d-9f54ec9fc3c4": {
+      "display_name": "Alex"
+    }
+  }
+}

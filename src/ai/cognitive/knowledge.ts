@@ -19,11 +19,20 @@
  */
 import { STAGE } from '../../core/constants';
 
+/** Shared dialogue context: plain data assembled by the dialogue engine. */
+export interface Ctx {
+  stage?: number;
+  decisions?: Record<string, any>;
+  trust?: number;
+  reunion?: boolean;
+  memCount?: number;
+}
+
 // ---------------------------------------------------------------------------
 // 1. Intent classification (what the player said)
 // ---------------------------------------------------------------------------
 
-const RULES = [
+const RULES: Array<[string, RegExp]> = [
   ['crate', /\b(crate|box|supply|supplies|shipment|missing|lost|stolen|steal|theft|thief|took|disappear\w*|order|what happened|any news|where is it|where'd it go)\b/],
   ['witness', /\b(saw|see|seen|witness\w*|notice\w*|clue|happen\w*|this morning|earlier (today|on)|watch\w*|did you watch|anything odd|anything strange|anything unusual|any idea)\b/],
   ['accuse', /\b(victor|handyman|he|him|that man)\b[^?.]{0,40}\b(took|stole|steal|stolen|grabbed|pinched|guilty|thief|suspicious|accuse\w*|blame)\b|\b(did you take|did you steal|you took|you stole|you moved it|you're the thief|are the thief|accuse|admit it|admit the truth|stop lying|you('re| are) lying|confess)\b/],
@@ -38,9 +47,9 @@ const RULES = [
 ];
 
 /** @returns {Set<string>} intents detected in a player message */
-export function classifyIntent(text) {
+export function classifyIntent(text: string) {
   const t = String(text || '').toLowerCase();
-  const hits = new Set();
+  const hits = new Set<string>();
   for (const [name, re] of RULES) if (re.test(t)) hits.add(name);
   return hits;
 }
@@ -53,12 +62,20 @@ export function classifyIntent(text) {
  *  crate already recovered (stage), earned trust, or already accused once
  *  (ctx counts accusations PRIOR to the line being answered — so the SECOND
  *  accusation is the one that snaps him). */
-export function victorAdmits({ stage, trust, accusations = 0 }) {
+export function victorAdmits({
+  stage = 0,
+  trust = 0,
+  accusations = 0,
+}: {
+  stage?: number;
+  trust?: number;
+  accusations?: number;
+}) {
   return stage >= STAGE.CRATE || trust >= 15 || accusations >= 1;
 }
 
-function factsFor(npcId, ctx) {
-  const { stage = STAGE.INTRO, decisions = {}, trust = 0 } = ctx;
+function factsFor(npcId: string, ctx: Ctx) {
+  const { stage = STAGE.INTRO, decisions = {} } = ctx;
   const knows = [];
   const doesnt = [];
 
@@ -114,7 +131,7 @@ function factsFor(npcId, ctx) {
  * Facts for the LLM system prompt: KNOWS / DOES NOT KNOW, stage-aware.
  * @returns {string[]}
  */
-export function promptFacts(npcId, ctx = {}) {
+export function promptFacts(npcId: string, ctx: Ctx = {}) {
   const { knows, doesnt } = factsFor(npcId, ctx);
   return [
     `MISSING SUPPLY CRATE — what you personally know:`,
@@ -129,14 +146,6 @@ export function promptFacts(npcId, ctx = {}) {
 // 2. Fallback conversation (no LLM configured) — still cognitive
 // ---------------------------------------------------------------------------
 
-function warmth(trust) {
-  if (trust > 40) return 'friend';
-  if (trust > 15) return 'friend';
-  if (trust > -10) return null;
-  if (trust > -40) return null;
-  return null;
-}
-
 const MAYA_CRATE_INTRO = [
   'This morning I set my supply crate down right here before opening — and by the time I turned around it was gone.',
   'It vanished. One minute it was beside the stall, the next — nothing.',
@@ -144,7 +153,7 @@ const MAYA_CRATE_INTRO = [
 const MAYA_HINT = 'Rosa was dancing by the fountain all morning — that girl misses nothing. Ask her what she saw.';
 
 /** Mission-aware opening line, layered on the engine's trust greeting. */
-export function greetingLine(npcId, ctx = {}) {
+export function greetingLine(npcId: string, ctx: Ctx = {}) {
   const { stage = STAGE.INTRO, decisions = {} } = ctx;
   if (npcId === 'maya') {
     if (stage >= STAGE.DONE) return 'I still can\'t thank you enough — you just made my whole season.';
@@ -165,9 +174,21 @@ export function greetingLine(npcId, ctx = {}) {
  * @param {{ npcId, persona, text, intents, ctx }} args
  * @returns {string} an in-character reply (UI marks it "placeholder")
  */
-export function fallbackReply({ npcId, persona, text, intents = new Set(), ctx = {} }) {
+export function fallbackReply({
+  npcId,
+  persona,
+  text,
+  intents = new Set<string>(),
+  ctx = {},
+}: {
+  npcId: string;
+  persona?: { name?: string } | null;
+  text: string;
+  intents?: Set<string>;
+  ctx?: Ctx;
+}) {
   const { stage = STAGE.INTRO, decisions = {}, trust = 0, reunion = false } = ctx;
-  const has = (i) => intents.has(i);
+  const has = (i: string) => intents.has(i);
   const t = String(text || '').trim();
 
   // Shared, low-effort branches ------------------------------------------------
@@ -314,7 +335,7 @@ export function fallbackReply({ npcId, persona, text, intents = new Set(), ctx =
   return `${persona?.name ?? 'They'} shrugs. [no fallback branch matched — connect an LLM for open conversation]`;
 }
 
-function hash(s) {
+function hash(s: string) {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return h;

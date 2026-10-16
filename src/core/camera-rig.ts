@@ -1,7 +1,17 @@
 import * as THREE from 'three';
 
 export class CameraRig {
-  constructor(camera) {
+  camera: THREE.PerspectiveCamera;
+  yaw: number;
+  pitch: number;
+  distance: number;
+  target: THREE.Vector3;
+  _desired: THREE.Vector3;
+  _lerpRate: number;
+  _ray?: THREE.Ray;
+  _hit?: THREE.Vector3;
+
+  constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
     this.yaw = Math.PI;           // behind the player at spawn
     this.pitch = 0.35;
@@ -11,7 +21,7 @@ export class CameraRig {
     this._lerpRate = 14;
   }
 
-  onMouseLook(dx, dy) {
+  onMouseLook(dx: number, dy: number) {
     this.yaw -= dx * 0.0024;
     this.pitch = THREE.MathUtils.clamp(this.pitch + dy * 0.002, -0.35, 1.25);
   }
@@ -26,7 +36,7 @@ export class CameraRig {
    *   fountain). The camera pulls in when one sits between the head and the
    *   desired orbit position, so it never ends up inside a wall.
    */
-  update(targetPos, dt, clearOfBoxes = []) {
+  update(targetPos: THREE.Vector3, dt: number, clearOfBoxes: THREE.Box3[] = []) {
     this.target.lerp(
       this._desired.set(targetPos.x, targetPos.y + 1.55, targetPos.z),
       1 - Math.pow(0.0002, dt),

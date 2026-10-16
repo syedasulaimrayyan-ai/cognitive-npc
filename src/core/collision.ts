@@ -6,7 +6,18 @@ import * as C from './constants';
  * (radius ~0.4) at ground level; walls/props push them out with a simple
  * slide response. Flat 2D, no vertical resolution needed (no climbable props).
  */
+/** Plain-array AABB (x/y/z triples), the shape every static collider uses. */
+export interface AABB {
+  min: number[];
+  max: number[];
+}
+
 export class CollisionGrid {
+  size: number;
+  cell: number;
+  grid: Map<string, AABB[]>;
+  boxes: AABB[];
+
   constructor(size = 200, cell = 2.2) {
     this.size = size;
     this.cell = cell;
@@ -14,14 +25,16 @@ export class CollisionGrid {
     this.boxes = [];
   }
 
-  add(box) {
+  add(box: AABB) {
     this.boxes.push(box);
     const [x0, , z0] = box.min;
     const [x1, , z1] = box.max;
     for (let cx = Math.floor((x0 + this.size) / this.cell); cx <= Math.floor((x1 + this.size) / this.cell); cx++) {
       for (let cz = Math.floor((z0 + this.size) / this.cell); cz <= Math.floor((z1 + this.size) / this.cell); cz++) {
         const k = cx + ',' + cz;
-        (this.grid.get(k) ?? this.grid.set(k, []).get(k)).push(box);
+        let cellBoxes = this.grid.get(k);
+        if (!cellBoxes) { cellBoxes = []; this.grid.set(k, cellBoxes); }
+        cellBoxes.push(box);
       }
     }
   }
@@ -30,7 +43,7 @@ export class CollisionGrid {
    * Resolve a circle-vs-world overlap for position (x, z). Mutates nothing,
    * returns the corrected position vector.
    */
-  resolve(pos, radius = 0.42) {
+  resolve(pos: THREE.Vector3, radius = 0.42) {
     let x = pos.x, z = pos.z;
     const cx = Math.floor((x + this.size) / this.cell);
     const cz = Math.floor((z + this.size) / this.cell);

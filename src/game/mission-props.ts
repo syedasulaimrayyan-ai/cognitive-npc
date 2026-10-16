@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import * as C from '../core/constants';
+import type { AssetLoader } from '../core/asset-loader';
+import type { AABB } from '../core/collision';
 
 /**
  * Mission-specific set dressing for "THE MISSING SUPPLY":
@@ -15,7 +17,26 @@ import * as C from '../core/constants';
  */
 
 // --- shared materials (built once per environment build) --------------------
-function makeMats(loader) {
+/** Clone a diff/nor/rough triple into a PBR material with its own repeats. */
+function pbrSet(
+  loader: AssetLoader,
+  slug: string,
+  repeat: [number, number],
+  extra: Partial<THREE.MeshStandardMaterialParameters> = {},
+) {
+  const map = loader.texture(`${slug}_diff`).clone();
+  const normalMap = loader.texture(`${slug}_nor`).clone();
+  const roughnessMap = loader.texture(`${slug}_rough`).clone();
+  for (const t of [map, normalMap, roughnessMap]) {
+    t.needsUpdate = true;
+    t.repeat.set(repeat[0], repeat[1]);
+  }
+  return new THREE.MeshStandardMaterial({
+    map, normalMap, roughnessMap, roughness: 1, metalness: 0.02, ...extra,
+  });
+}
+
+function makeMats(loader: AssetLoader) {
   const wood = loader.texture('wood').clone();
   wood.needsUpdate = true;
   wood.repeat.set(2, 2);
@@ -26,13 +47,8 @@ function makeMats(loader) {
   woodRough.needsUpdate = true;
   woodRough.repeat.set(2, 2);
 
-  const plaster = loader.texture('plaster').clone();
-  plaster.needsUpdate = true;
-  plaster.repeat.set(3, 1.5);
-
-  const concrete = loader.texture('concrete').clone();
-  concrete.needsUpdate = true;
-  concrete.repeat.set(2, 2);
+  const plaster = pbrSet(loader, 'rough_plaster_brick', [3, 1.5]);
+  const concrete = pbrSet(loader, 'concrete', [2, 2]);
 
   return {
     wood: new THREE.MeshStandardMaterial({
@@ -41,10 +57,10 @@ function makeMats(loader) {
     woodDark: new THREE.MeshStandardMaterial({
       map: wood, normalMap: woodNormal, color: 0x9a7a55, roughness: 0.95, metalness: 0,
     }),
-    plaster: new THREE.MeshStandardMaterial({ map: plaster, roughness: 0.9 }),
-    concrete: new THREE.MeshStandardMaterial({ map: concrete, roughness: 0.95 }),
+    plaster,
+    concrete,
     frame: new THREE.MeshStandardMaterial({ color: 0x6e5236, roughness: 1 }),
-    roofMat: new THREE.MeshStandardMaterial({ color: 0x4d453c, roughness: 1 }),
+    roofMat: pbrSet(loader, 'clay_roof_tiles', [3, 2]),
     doorBlue: new THREE.MeshStandardMaterial({ color: 0x2f5f86, roughness: 0.6, metalness: 0.1 }),
     canvas: new THREE.MeshStandardMaterial({ color: 0xc4553d, roughness: 0.85, side: THREE.DoubleSide }),
     canvasAlt: new THREE.MeshStandardMaterial({ color: 0x3f7a6a, roughness: 0.85, side: THREE.DoubleSide }),
@@ -66,9 +82,9 @@ function buildCrate(w = 0.95) {
  * Build all mission props into `scene`.
  * @returns {{ colliders: object[], beacon: Beacon }}
  */
-export function buildMissionProps(scene, loader) {
+export function buildMissionProps(scene: THREE.Scene, loader: AssetLoader) {
   const mats = makeMats(loader);
-  const colliders = [];
+  const colliders: AABB[] = [];
 
   // ---- The old storehouse ---------------------------------------------------
   const S = C.STOREHOUSE;
@@ -227,7 +243,15 @@ export function buildMissionProps(scene, loader) {
  * additive blending, no per-frame allocation.
  */
 export class Beacon {
-  constructor(scene) {
+  scene: THREE.Scene;
+  shaftMat: THREE.MeshBasicMaterial;
+  shaft: THREE.Mesh;
+  arrow: THREE.Mesh;
+  group: THREE.Group;
+  _t: number;
+  _camPos: THREE.Vector3;
+
+  constructor(scene: THREE.Scene) {
     this.scene = scene;
     const shaftGeo = new THREE.CylinderGeometry(0.55, 0.75, 6, 14, 1, true);
     this.shaftMat = new THREE.MeshBasicMaterial({
@@ -258,13 +282,13 @@ export class Beacon {
   }
 
   /** Point the beacon at a world position, or hide it with set(null). */
-  set(pos) {
+  set(pos?: { x: number; z: number } | null) {
     if (!pos) { this.group.visible = false; return; }
     this.group.position.set(pos.x, 0, pos.z);
     this.group.visible = true;
   }
 
-  update(dt, camera) {
+  update(dt: number, camera?: THREE.Camera) {
     if (!this.group.visible) return;
     this._t += dt;
     this.arrow.position.y = 4.6 + Math.sin(this._t * 2.4) * 0.25;

@@ -1,6 +1,4 @@
-import React from 'react';
-
-export function LoadingOverlay({ message }) {
+export function LoadingOverlay({ message }: { message: string }) {
   return (
     <div className="loading-overlay">
       <div className="loading-box">

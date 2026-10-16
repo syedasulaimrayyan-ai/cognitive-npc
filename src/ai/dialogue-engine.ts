@@ -1,12 +1,85 @@
 import { NPCS } from '../core/constants';
 import { MemoryStore } from './cognitive/memory';
 import { personaFor } from './cognitive/persona';
-import { classifyIntent, promptFacts, fallbackReply, greetingLine } from './cognitive/knowledge';
+import { classifyIntent, promptFacts, fallbackReply, greetingLine, type Ctx } from './cognitive/knowledge';
+import { loadCloudConfig } from './cloud/cloud-config';
+import { SupabaseGeminiProvider, type CloudTurnResult } from './cloud/cloud-provider';
 
 const CONFIG_KEY = 'cnpc.llm';
 
+/** User-supplied model config (localStorage JSON — never hardcoded). */
+export interface LlmConfig {
+  endpoint: string;
+  model?: string;
+  key?: string;
+  [k: string]: any;
+}
+
+/** A line in the conversation log shown by React. */
+export type MessageWho = 'player' | 'npc' | 'typing' | 'system';
+
+export interface DialogueMessage {
+  id: number;
+  who: MessageWho;
+  text: string;
+  badge: string | null;
+}
+
+/** Dialogue payload pushed to React (mirrors GameClient._pushDialogueFrom). */
+export interface DialoguePayload {
+  npc: { name: string; role: string; color: string; trust: number; memEventCount: number };
+  messages: DialogueMessage[];
+  pending: boolean;
+  status: string;
+  warn: boolean;
+  sttSupported?: boolean;
+  /** Live voice-layer state (pushed by GameClient via VoiceIO callbacks). */
+  voice?: { phase: 'idle' | 'listening' | 'speaking'; muted: boolean; canReplay: boolean };
+}
+
+/** Fresh mission context produced by _missionCtx(). */
+export interface DialogueCtx {
+  stage: number;
+  decisions: Record<string, any>;
+  trust: number;
+  reunion: boolean;
+  memCount: number;
+}
+
+/** Persona shape used across the engine (see PERSONAS in cognitive/persona). */
+interface PersonaLike {
+  id: string;
+  name: string;
+  role: string;
+  color: string;
+  personality: string;
+  styleRule: string;
+  voicePitch: number;
+  [k: string]: any;
+}
+
+interface ChatMessage {
+  role: string;
+  content: string;
+}
+
+interface TalkOptions {
+  memory?: { trust: number; numMemories: number };
+  playerMessage: string;
+  npcId: string;
+  persona: PersonaLike;
+  intents?: Set<string>;
+  missionCtx?: Ctx;
+}
+
+interface Provider {
+  readonly label: string;
+  readonly isPlaceholder: boolean;
+  talk(messages: ChatMessage[], opts: TalkOptions): Promise<string>;
+}
+
 /** Loads/validates the user-supplied model config. Returns null if unset. */
-export function loadLlmConfig() {
+export function loadLlmConfig(): LlmConfig | null {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
     if (!raw) return null;
@@ -16,16 +89,68 @@ export function loadLlmConfig() {
   } catch { return null; }
 }
 
-export function saveLlmConfig(cfg) {
+export function saveLlmConfig(cfg: LlmConfig) {
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
 }
 
-function createProvider(cfg) {
+function createProvider(cfg: LlmConfig | null): Provider {
+  // Priority: Supabase+Gemini cloud backend (when configured) > user-supplied
+  // OpenAI-compatible endpoint > labelled mission-aware demo replies.
+  const cloud = loadCloudConfig();
+  if (cloud.config) {
+    try {
+      return new CloudGeminiAdapter(new SupabaseGeminiProvider(cloud.config));
+    } catch { /* fall through to local options */ }
+  }
   return cfg ? new OpenAICompatibleProvider(cfg) : new MissionAwareFallback();
 }
 
+/**
+ * Adapts the Supabase Edge Function client to the Provider interface.
+ * Trust is SERVER-AUTHORITATIVE here: after each turn the engine syncs
+ * local trust from the backend response, and local heuristic trust tweaks
+ * are skipped (Gemini was instructed to emit trustDelta itself).
+ * Stored memories are mirrored into the local store so mission logic and
+ * the HUD stay correct even offline.
+ */
+class CloudGeminiAdapter implements Provider {
+  private cloud: SupabaseGeminiProvider;
+  lastResult: CloudTurnResult | null = null;
+  /** Last transport/API failure — makes the status strip tell the truth. */
+  degraded: string | null = null;
+
+  constructor(cloud: SupabaseGeminiProvider) { this.cloud = cloud; }
+
+  get label() {
+    if (this.degraded) return `Cloud unavailable — demo replies (last error: ${this.degraded})`;
+    return this.cloud.label;
+  }
+  get isPlaceholder() { return false; }
+
+  async talk(messages: ChatMessage[], opts: TalkOptions): Promise<string> {
+    const npcId = opts.npcId;
+    const playerMessage = opts.playerMessage;
+    const history = messages
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .slice(0, -1) // last entry is the live user turn
+      .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+    try {
+      this.lastResult = await this.cloud.talk(npcId, playerMessage, history);
+      this.degraded = null; // recovered
+      return this.lastResult.reply;
+    } catch (e) {
+      this.degraded = e instanceof Error ? e.message : String(e);
+      throw e;
+    }
+  }
+}
+
 class OpenAICompatibleProvider {
-  constructor(cfg) {
+  endpoint: string;
+  model?: string;
+  key: string;
+
+  constructor(cfg: LlmConfig) {
     this.endpoint = cfg.endpoint;
     this.model = cfg.model;
     this.key = cfg.key || '';
@@ -34,7 +159,7 @@ class OpenAICompatibleProvider {
     return `Connected: ${this.model || 'default model'} via ${this.endpoint} — first message tests the connection`;
   }
   get isPlaceholder() { return false; }
-  async talk(messages) {
+  async talk(messages: ChatMessage[], _opts: TalkOptions): Promise<string> {
     const res = await fetch(this.endpoint, {
       method: 'POST',
       headers: {
@@ -62,7 +187,8 @@ class MissionAwareFallback {
     return 'No AI model configured — mission-aware placeholder replies (see README to connect a model).';
   }
   get isPlaceholder() { return true; }
-  async talk(_messages, { npcId, persona, playerMessage, intents, missionCtx } = {}) {
+  async talk(_messages: ChatMessage[], opts: TalkOptions): Promise<string> {
+    const { npcId, persona, playerMessage, intents, missionCtx } = opts;
     await new Promise((r) => setTimeout(r, 300 + Math.random() * 400)); // simulate latency
     return fallbackReply({
       npcId, persona, text: playerMessage,
@@ -81,7 +207,18 @@ class MissionAwareFallback {
  *                                        (stage changes, decision flags)
  */
 export class DialogueEngine {
-  constructor(npcDef, hooks = {}) {
+  def: (typeof NPCS)[number];
+  persona: PersonaLike;
+  memory: MemoryStore;
+  hooks: EngineHooks;
+  provider: Provider;
+  messages: DialogueMessage[];
+  pending: boolean;
+  _seq: number;
+  _greeted: boolean;
+  _reunionOnEntry?: boolean;
+
+  constructor(npcDef: (typeof NPCS)[number], hooks: EngineHooks = {}) {
     this.def = NPCS.find((n) => n.id === npcDef.id) ?? npcDef;
     this.persona = personaFor(npcDef.id) ?? { ...npcDef, name: npcDef.name, role: npcDef.role };
     this.memory = new MemoryStore(this.def.id);
@@ -94,8 +231,8 @@ export class DialogueEngine {
   }
 
   /** Fresh mission context at call time (stage may have moved). */
-  _missionCtx() {
-    const ctx = this.hooks.getMissionCtx?.() ?? {};
+  _missionCtx(): DialogueCtx {
+    const ctx: Ctx = this.hooks.getMissionCtx?.() ?? {};
     return {
       stage: ctx.stage ?? 0,
       decisions: ctx.decisions ?? {},
@@ -136,7 +273,7 @@ export class DialogueEngine {
     this.memory.logExchange('npc', line);
   }
 
-  _greetingText(ctx) {
+  _greetingText(ctx: DialogueCtx) {
     const trust = this.memory.trust;
     // Mission-authored opening line (knowledge.js) takes priority — it is
     // stage- and decision-aware; otherwise fall back to trust ladder.
@@ -148,7 +285,7 @@ export class DialogueEngine {
       `...`;
   }
 
-  async submit(playerText) {
+  async submit(playerText: string) {
     if (this.pending || !playerText?.trim()) return;
     const text = playerText.trim();
     this.pending = true;
@@ -198,10 +335,18 @@ export class DialogueEngine {
 
       this._replaceMsg(typingId, 'npc', reply, this.provider.isPlaceholder ? 'placeholder' : null);
       this.memory.logExchange('npc', reply);
-      this._applyReaction(text, reply, intents);
+      if (this.provider instanceof CloudGeminiAdapter && this.provider.lastResult) {
+        // Server-authoritative trust + mirror any memories the backend stored
+        // so local mission logic/HUD reflect the cloud state after a reload.
+        const r = this.provider.lastResult;
+        this.memory.setTrust(r.trust);
+        for (const m of r.stored) this.memory.addEvent(m.type, m.summary, 4, []);
+      } else {
+        this._applyReaction(text, reply, intents);
+      }
       this.hooks.onGesture?.();
       this.hooks.onReply?.(reply);
-    } catch (err) {
+    } catch (err: any) {
       // AI service failed mid-conversation: surface the error visibly AND keep
       // the mission playable by falling back to the offline branch for this turn.
       this._replaceMsg(typingId, 'system', `Model call failed — ${err?.message || err}`);
@@ -221,7 +366,7 @@ export class DialogueEngine {
   }
 
   /** Memory-driven reaction to what the player said (intent-based). */
-  _applyReaction(playerText, reply, intents = classifyIntent(playerText)) {
+  _applyReaction(playerText: string, reply: string, intents: Set<string> = classifyIntent(playerText)) {
     if (intents.has('accuse')) {
       // Pointing a finger costs trust with the person you point it at —
       // Victor's confession gate (knowledge.victorAdmits: 2nd accusation)
@@ -250,18 +395,29 @@ export class DialogueEngine {
     }
   }
 
-  _pushMsg(who, text, badge = null) {
+  _pushMsg(who: MessageWho, text: string, badge: string | null = null) {
     const m = { id: ++this._seq, who, text, badge };
     this.messages.push(m);
     if (who === 'npc') this._notify();
     return m.id;
   }
 
-  _replaceMsg(id, who, text, badge = null) {
+  _replaceMsg(id: number, who: MessageWho, text: string, badge: string | null = null) {
     const i = this.messages.findIndex((m) => m.id === id);
     if (i >= 0) this.messages[i] = { id, who, text, badge };
     this._notify();
   }
 
   closeSession() { /* everything already persisted */ }
+}
+
+/** Hooks GameClient injects when it owns a conversation. */
+export interface EngineHooks {
+  onUpdate?: (payload: DialoguePayload) => void;
+  openState?: () => boolean;
+  onGesture?: () => void;
+  onReply?: (text: string) => void;
+  sttSupported?: boolean;
+  getMissionCtx?: () => Ctx;
+  onWorldEvent?: (kind: string, payload: { npcId: string; intents: string[] }) => unknown;
 }

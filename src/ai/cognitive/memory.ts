@@ -14,8 +14,37 @@
 const PREFIX = 'cnpc2.memory.';
 const LIMIT = { events: 120, log: 160 };
 
+export interface MemoryEvent {
+  t: number;
+  type: string;
+  summary: string;
+  salience: number;
+  keywords: string[];
+}
+
+export interface Relationship {
+  note: string;
+  affinity: number;
+}
+
+export interface MemoryState {
+  trust: number;
+  events: MemoryEvent[];
+  relationships: Record<string, Relationship>;
+  conversationLog: { t: number; who: string; text: string }[];
+}
+
+export interface MemorySeed {
+  trust?: number;
+  events?: MemoryEvent[];
+  relationships?: Record<string, Relationship>;
+}
+
 export class MemoryStore {
-  constructor(npcId, seed = {}) {
+  npcId: string;
+  state: MemoryState;
+
+  constructor(npcId: string, seed: MemorySeed = {}) {
     this.npcId = npcId;
     this.state = this._load() ?? {
       trust: seed.trust ?? 0,
@@ -25,7 +54,7 @@ export class MemoryStore {
     };
   }
 
-  _load() {
+  _load(): MemoryState | null {
     try {
       const raw = localStorage.getItem(PREFIX + this.npcId);
       if (raw) return JSON.parse(raw);
@@ -40,12 +69,18 @@ export class MemoryStore {
 
   get trust() { return this.state.trust; }
 
-  adjustTrust(delta) {
+  adjustTrust(delta: number) {
     this.state.trust = Math.max(-100, Math.min(100, this.state.trust + delta));
     this._save();
   }
 
-  addEvent(type, summary, salience = 1, keywords = []) {
+  /** Server-authoritative trust sync (cloud backend). */
+  setTrust(value: number) {
+    this.state.trust = Math.max(-100, Math.min(100, Math.round(value)));
+    this._save();
+  }
+
+  addEvent(type: string, summary: string, salience = 1, keywords: string[] = []) {
     this.state.events.push({
       t: Date.now(),
       type,
@@ -57,7 +92,7 @@ export class MemoryStore {
     this._save();
   }
 
-  setRelationship(name, note, affinityDelta = 0) {
+  setRelationship(name: string, note: string, affinityDelta = 0) {
     const r = this.state.relationships[name] ?? { note: '', affinity: 0 };
     r.note = note || r.note;
     r.affinity += affinityDelta;
@@ -65,7 +100,7 @@ export class MemoryStore {
     this._save();
   }
 
-  logExchange(who, text) {
+  logExchange(who: string, text: string) {
     this.state.conversationLog.push({ t: Date.now(), who, text });
     while (this.state.conversationLog.length > LIMIT.log) this.state.conversationLog.shift();
     this._save();
@@ -81,7 +116,7 @@ export class MemoryStore {
     const scored = this.state.events.map((ev) => {
       const ageMin = (now - ev.t) / 60000;
       const decay = Math.pow(0.5, ageMin / 30);
-      const kwHits = ev.keywords?.filter((kw) => q.includes(kw.toLowerCase())).length ?? 0;
+      const kwHits = ev.keywords?.filter((kw: string) => q.includes(kw.toLowerCase())).length ?? 0;
       return { ev, score: ev.salience * decay + kwHits * 2 };
     });
     scored.sort((a, b) => b.score - a.score);
@@ -94,7 +129,13 @@ export class MemoryStore {
   }
 
   /** Build an LLM system prompt from personality + retrieved memories. */
-  buildSystemPrompt(persona) {
+  buildSystemPrompt(persona: {
+    name: string;
+    role: string;
+    personality: string;
+    styleRule: string;
+    lastPlayerMessage?: string;
+  }) {
     const mems = this.retrieve(persona.lastPlayerMessage ?? '', 6);
     const trust = this.state.trust;
     const attitude =

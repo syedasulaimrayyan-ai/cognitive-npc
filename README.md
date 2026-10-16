@@ -40,30 +40,32 @@ cognitive-npc/
 ├── scripts/mock-llm.mjs        # LOCAL test double for the AI endpoint (dev only)
 ├── public/assets/
 │   ├── characters/*.glb        # rigged characters with real animation clips
+│   ├── models/<name>/<name>.glb# CC0 prop models (decimated, self-contained GLB)
+│   ├── hdris/*.hdr             # sky HDRI (image-based lighting + background)
 │   └── textures/*.jpg          # PBR maps (Poly Haven CC0)
 └── src/
-    ├── main.jsx                # React entry → ui/App.jsx
+    ├── main.tsx                # React entry → ui/App.tsx
     ├── core/
-    │   ├── game-client.js      # orchestrator: scene, loop, mission wiring, HUD sync
-    │   ├── environment.js      # town: terrain, roads, buildings, plaza, lights, sky
-    │   ├── asset-loader.js     # GLB + texture loading (throws loudly on missing assets)
-    │   ├── camera-rig.js       # third-person camera with wall occlusion
-    │   ├── collision.js        # uniform-grid AABB world collision
-    │   ├── input.js            # keyboard/mouse, pointer-lock + drag fallback
-    │   └── constants.js        # world layout, NPC identities, mission geography, STAGE
+    │   ├── game-client.ts      # orchestrator: scene, loop, mission wiring, HUD sync
+    │   ├── environment.ts      # town: terrain, roads, buildings, plaza, lights, sky
+    │   ├── asset-loader.ts     # GLB + texture + HDRI loading (throws loudly on missing assets)
+    │   ├── camera-rig.ts       # third-person camera with wall occlusion
+    │   ├── collision.ts        # uniform-grid AABB world collision
+    │   ├── input.ts            # keyboard/mouse, pointer-lock + drag fallback
+    │   └── constants.ts        # world layout, NPC identities, mission geography, STAGE
     ├── entities/
-    │   ├── player-avatar.js    # rigged player: mixer blending Idle/Walk/Run, gravity, jump
-    │   └── npc-avatar.js       # rigged NPCs: idle loop, look-at, gesture clips, tinting
+    │   ├── player-avatar.ts    # rigged player: mixer blending Idle/Walk/Run, gravity, jump
+    │   └── npc-avatar.ts       # rigged NPCs: idle loop, look-at, gesture clips, tinting
     ├── game/
-    │   ├── mission.js          # "THE MISSING SUPPLY" state machine (persisted)
-    │   └── mission-props.js    # crate, old storehouse, market stalls, arch, beacon
+    │   ├── mission.ts          # "THE MISSING SUPPLY" state machine (persisted)
+    │   └── mission-props.ts    # crate, old storehouse, market stalls, arch, beacon
     ├── ai/
-    │   ├── dialogue-engine.js  # conversation driver: prompt assembly, provider calls
+    │   ├── dialogue-engine.ts  # conversation driver: prompt assembly, provider calls
     │   ├── cognitive/
-    │   │   ├── memory.js       # persistent structured memory + retrieval + trust
-    │   │   ├── persona.js      # persona index
-    │   │   └── knowledge.js    # intents, knowledge boundaries, offline conversation
-    │   └── voice/voice-io.js   # Web Speech STT + speechSynthesis TTS
+    │   │   ├── memory.ts       # persistent structured memory + retrieval + trust
+    │   │   ├── persona.ts      # persona index
+    │   │   └── knowledge.ts    # intents, knowledge boundaries, offline conversation
+    │   └── voice/voice-io.ts   # Web Speech STT + speechSynthesis TTS
     └── ui/                     # React: App, HUD (tracker/completion), DialoguePanel…
 ```
 
@@ -112,6 +114,53 @@ where you left off.
 
 ## AI conversation
 
+### Cloud backend: Gemini via Supabase Edge Functions (preferred)
+
+When configured, dialogue runs through the `npc-dialogue` Edge Function:
+**player JWT → RLS-scoped memory read → Gemini (server-held key) → memories +
+trust written back**. The browser only ever holds the project URL and the
+publishable anon key (`.env.example`); the Gemini key lives in Supabase
+secrets and the app never uses a service-role key at all.
+
+Setup (one-time, requires your own Supabase + Google AI Studio accounts):
+
+1. Create a project at [supabase.com](https://supabase.com), enable
+   **Anonymous sign-ins** (Authentication → Providers → Anonymous).
+2. Apply the migration:
+   `supabase db push` (SQL is in `supabase/migrations/`).
+3. Deploy the function:
+   `supabase functions deploy npc-dialogue`.
+4. Set the Gemini key (from [aistudio.google.com](https://aistudio.google.com/apikey)):
+   `supabase secrets set GEMINI_API_KEY=…`.
+5. Copy `.env.example` → `.env` with your project URL + anon key, then
+   `npm run dev`.
+
+Provider priority: **Supabase cloud → `cnpc.llm` OpenAI-compatible endpoint →
+labelled mission-aware demo replies.** Failures (quota 429, auth, network,
+timeout, missing key) surface as a visible system line, and the turn falls
+back to demo replies badged `placeholder` — scripted text is never presented
+as genuine AI.
+
+Local test double for the backend (dev only, scripted replies clearly marked
+`mock-scripted`): `node scripts/mock-supabase.mjs`, then in the console:
+
+```js
+localStorage.setItem('cnpc.cloud', JSON.stringify({ url: 'http://localhost:8789', anonKey: 'mock-anon' }));
+location.reload();
+```
+
+### INITIAL SIMULATED MEMORIES (Fictional Initial State)
+
+These are seeded fictional memories to give NPCs initial personality and history. They are labeled as simulated/fictional and do not represent real events. Subsequent gameplay adds real memories.
+
+**Important NPCs (10):** Arjun (cautious shopkeeper, broken promise), Maya Chen (friendly market vendor, past help), Ravi (distrustful guard, suspicious activity), Kabir (curious traveller, rumors), Leela (wise elder, values courtesy), Dev (merchant, broken trade agreement), Sana (messenger, appreciates help), Imran (musician, friendly history), Victor Osei (gruff handyman), Rosa Delgado (dancer/witness). See constants.ts for full seeds.
+
+Memories are per (player, npc): each anonymous browser session gets its own
+Supabase user id, every table is RLS-locked to `auth.uid()`, and each NPC's
+rows are keyed separately — Maya's memories never appear in Victor's prompt.
+
+### Local / BYO endpoint
+
 Any endpoint speaking the OpenAI `/chat/completions` shape works (LM Studio,
 Ollama `/v1`, llama.cpp, OpenRouter…). In the browser console:
 
@@ -139,11 +188,25 @@ For a local test double of the endpoint: `node scripts/mock-llm.mjs`.
 
 ### Voice
 
-- **STT**: Web Speech API (`mic` button) — needs Chrome/Edge; permission
-  denial and recognition errors surface visibly in the panel.
-- **TTS**: `speechSynthesis`, pitch varies per persona — real and working.
+- **STT**: Web Speech API (`mic` button) — needs Chrome/Edge. Press 🎤 →
+  pulsing *Listening…* state → the recognized text appears in a confirm bar
+  with **Send / Retry / Cancel** (nothing is auto-submitted). Pressing 🎤
+  again cancels. Denied permission, no speech, missing mic, network failures
+  and unsupported browsers each surface their own clear message. Limitation:
+  Chrome's recognition uses Google's network service — offline/sandboxed
+  environments get an honest network error instead of a fake transcript.
+- **TTS**: `speechSynthesis` first — NPC replies play automatically with a
+  persona-shaped pitch; **Mute / Replay / Stop** controls in the panel
+  (mute persists). Speech can never overlap: every new reply hard-cancels the
+  previous utterance.
+- **States**: listening → transcript confirm → *thinking…* → *speaking*;
+  duplicates blocked (mic disabled while a reply is pending, double-click
+  guarded, one transcript send).
+- **Animation**: NPCs play their real idle clip throughout and a one-shot
+  gesture on each reply, on replay, and periodically while speaking.
+  **No lip-sync or facial animation** — none exists and none is claimed.
 - **Hosted neural TTS/STT**: an unwired seam (`cnpc.tts` config key) — not
-  integrated, and nothing fakes it.
+  integrated, and nothing fakes it. No voice API keys ship in the frontend.
 
 ## Assets & licences
 
@@ -151,22 +214,30 @@ For a local test double of the endpoint: `node scripts/mock-llm.mjs`.
 | --- | --- | --- |
 | Soldier / Xbot / Michelle GLBs | three.js example assets | MIT |
 | grass, asphalt, concrete, brick, plaster, **wood_planks** (diff/normal/rough) | Poly Haven (1K) | CC0 |
+| red_brick, rough_plaster_brick, painted_plaster_wall, concrete_pavement, cobblestone_02, clay_roof_tiles, leafy_grass, concrete (diff/nor/rough 1K) | Poly Haven | CC0 |
+| kloofendal_48d_partly_cloudy_puresky_1k.hdr (sky / IBL) | Poly Haven | CC0 |
+| tree_small_02, shrub_01 (+ `_low` LOD variants) | Poly Haven models, decimated with meshoptimizer | CC0 |
+| street_lamp_01, painted_wooden_bench, planter_box_01, wooden_crate_01, wine_barrel_01, fire_hydrant, metal_trash_can | Poly Haven models, decimated with meshoptimizer | CC0 |
 
 The loader **throws** if any required file or clip is missing — no silent
 fallbacks, no cube stand-ins for characters.
 
 ## Known limits (honest list)
 
-- Buildings are procedurally massed boxes with PBR facades, roofs and window
-  bands — detailed enough to read as a town, not photoreal modular buildings.
+- Buildings are procedurally massed boxes with PBR facades, roofs, windows,
+  doors and awnings — detailed enough to read as a town, not photoreal modular
+  buildings.
 - Player clips are Idle/Walk/Run only: jumping holds a frozen walk pose (no
   jump clip exists in Soldier.glb), and turns are slerped rather than played
   as turn animations.
 - NPCs idle + look-at + one-shot gestures; no lip-sync or facial animation
   (not claimed anywhere in the UI).
-- No LOD system — the map is ~200 m; shadows use one 2048² cascade, pixel
-  ratio capped at 1.5 (≈110 draw calls, ~65k triangles — smooth on desktop
-  GPUs).
+- Trees and shrubs use two-level `THREE.LOD` (full scan-quality mesh near,
+  decimated variant beyond ~25 m); props are single meshes. Sky + ambient come
+  from a CC0 HDRI through `PMREMGenerator`; the sun is a directional light
+  aligned to the HDRI's sun disc, one 2048² shadow map, pixel ratio capped at
+  1.5. Typical town view ≈95 draw calls / ~240k triangles, 45–55 FPS on a
+  mid-range GPU (measured in Chrome).
 - Web STT needs Chrome/Edge; hosted neural voices are an unwired seam.
 
 ## Resetting

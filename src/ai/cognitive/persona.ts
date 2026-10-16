@@ -19,6 +19,6 @@ export const PERSONAS = Object.fromEntries(
   ]),
 );
 
-export function personaFor(id) {
+export function personaFor(id: string) {
   return PERSONAS[id] ?? null;
 }
